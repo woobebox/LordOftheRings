@@ -394,8 +394,8 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(92px, 1fr));
   gap: 8px;
-  padding: 8px;
   width: min(390px, calc(100vw - 36px));
+  padding: 8px;
 }
 
 .resource-pill {
@@ -2857,7 +2857,7 @@
 
 @media (max-width: 1320px) {
   .quest-panel {
-    max-height: calc(100vh - 412px);
+    max-height: calc(100vh - 362px);
   }
 
   .party-bar {
@@ -2870,7 +2870,7 @@
 
   .character-panel {
     bottom: 250px;
-    max-height: calc(100vh - 412px);
+    max-height: calc(100vh - 362px);
   }
 
   .hud-toggle-panel {
@@ -3064,6 +3064,11 @@
   .resource-delta-list,
   .resource-delta-list.compact {
     grid-template-columns: 1fr;
+  }
+
+  .party-resource-hud {
+    flex-basis: 100%;
+    min-width: 0;
   }
 
   .party-bar {
