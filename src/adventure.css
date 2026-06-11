@@ -373,7 +373,7 @@
 }
 
 .map-control-panel {
-  top: 112px;
+  top: 126px;
   left: 50%;
   transform: translateX(-50%);
 }
@@ -389,13 +389,13 @@
 .party-resource-hud {
   position: fixed;
   z-index: 21;
-  left: 50%;
-  top: 18px;
+  right: 18px;
+  top: 112px;
   display: grid;
   grid-template-columns: repeat(3, minmax(92px, 1fr));
   gap: 8px;
   padding: 8px;
-  transform: translateX(-50%);
+  width: min(390px, calc(100vw - 36px));
 }
 
 .resource-pill {
@@ -530,9 +530,9 @@
   position: fixed;
   z-index: 18;
   left: 18px;
-  top: 112px;
+  top: 178px;
   width: min(340px, calc(100vw - 36px));
-  max-height: calc(100vh - 244px);
+  max-height: calc(100vh - 310px);
   overflow: auto;
   padding: 14px;
 }
@@ -541,9 +541,9 @@
   position: fixed;
   z-index: 18;
   right: 18px;
-  top: 112px;
+  top: 178px;
   width: min(390px, calc(100vw - 36px));
-  max-height: calc(100vh - 232px);
+  max-height: calc(100vh - 298px);
   overflow: auto;
   padding: 15px;
 }
@@ -552,10 +552,10 @@
   position: fixed;
   z-index: 34;
   right: 18px;
-  top: 112px;
+  top: 178px;
   bottom: 132px;
   width: min(420px, calc(100vw - 36px));
-  max-height: calc(100vh - 244px);
+  max-height: calc(100vh - 310px);
   display: grid;
   grid-template-columns: 62px minmax(0, 1fr);
   align-content: start;
@@ -2857,7 +2857,7 @@
 
 @media (max-width: 1320px) {
   .quest-panel {
-    max-height: calc(100vh - 362px);
+    max-height: calc(100vh - 412px);
   }
 
   .party-bar {
@@ -2870,7 +2870,7 @@
 
   .character-panel {
     bottom: 250px;
-    max-height: calc(100vh - 362px);
+    max-height: calc(100vh - 412px);
   }
 
   .hud-toggle-panel {
