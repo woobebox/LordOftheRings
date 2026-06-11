@@ -1,6 +1,8 @@
+const publicAsset = (path) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`;
+
 export const locationScenes = {
   shire: {
-    image: '/assets/locations/shire-scene.svg',
+    image: publicAsset('/assets/locations/shire-scene.svg'),
     focalPoint: '48% 54%',
     entryTitle: '袋底洞外的遠征起點',
     entryObjective: '確認補給、避開黑騎士耳目，從田園路線秘密離開夏爾。',
@@ -13,7 +15,7 @@ export const locationScenes = {
       'Original fantasy game environment concept art of a peaceful green hill village with round doors, vegetable gardens, and soft morning mist; no film stills, no logos, no text.',
   },
   rivendell: {
-    image: '/assets/locations/rivendell-scene.svg',
+    image: publicAsset('/assets/locations/rivendell-scene.svg'),
     focalPoint: '58% 44%',
     entryTitle: '愛隆會議前的山谷庇護所',
     entryObjective: '穿越瀑布露台，集結盟友並確認至尊魔戒的處置方案。',
@@ -26,7 +28,7 @@ export const locationScenes = {
       'Original fantasy game environment concept art of an elven valley refuge with cascading waterfalls, terraces, autumn trees, and luminous bridges; no actor likeness, no film stills, no text.',
   },
   moria: {
-    image: '/assets/locations/moria-scene.svg',
+    image: publicAsset('/assets/locations/moria-scene.svg'),
     focalPoint: '51% 58%',
     entryTitle: '卡札督姆深處的失落大廳',
     entryObjective: '在巨柱與窄橋間維持隊形，穿越地下王國並避免驚動深處威脅。',
@@ -39,7 +41,7 @@ export const locationScenes = {
       'Original dark fantasy game environment concept art of an abandoned underground dwarf hall, immense pillars, a narrow bridge, cold blue torchlight, and deep shadow; no film stills, no text.',
   },
   lothlorien: {
-    image: '/assets/locations/lothlorien-scene.svg',
+    image: publicAsset('/assets/locations/lothlorien-scene.svg'),
     focalPoint: '50% 48%',
     entryTitle: '黃金森林的試煉之夜',
     entryObjective: '進入樹上平台接受庇護與試煉，取得後續潛行所需支援。',
@@ -52,7 +54,7 @@ export const locationScenes = {
       'Original fantasy game environment concept art of a golden forest sanctuary with high platforms, glowing leaves, silver trunks, and quiet moonlit atmosphere; no film stills, no text.',
   },
   'helms-deep': {
-    image: '/assets/locations/helms-deep-scene.svg',
+    image: publicAsset('/assets/locations/helms-deep-scene.svg'),
     focalPoint: '50% 58%',
     entryTitle: '暴雨中的深牆防線',
     entryObjective: '部署守軍、守住號角堡與深牆，撐到援軍抵達。',
@@ -65,7 +67,7 @@ export const locationScenes = {
       'Original cinematic fantasy game environment concept art of a stone fortress set into a mountain gorge under storm clouds, defensive walls and torch lines; no film stills, no text.',
   },
   'minas-tirith': {
-    image: '/assets/locations/minas-tirith-scene.svg',
+    image: publicAsset('/assets/locations/minas-tirith-scene.svg'),
     focalPoint: '54% 52%',
     entryTitle: '白城七層防線啟動',
     entryObjective: '巡視城牆、點燃烽火，為帕蘭諾平原之戰爭取時間。',
@@ -78,7 +80,7 @@ export const locationScenes = {
       'Original epic fantasy game environment concept art of a white tiered city built into a mountain, sunlit battlements, banners, and a wide battlefield horizon; no film stills, no text.',
   },
   'dead-marshes': {
-    image: '/assets/locations/dead-marshes-scene.svg',
+    image: publicAsset('/assets/locations/dead-marshes-scene.svg'),
     focalPoint: '48% 62%',
     entryTitle: '亡者倒影之間的潛行路線',
     entryObjective: '跟隨嚮導穿越淺水與綠霧，避開戒靈巡弋視線。',
@@ -91,7 +93,7 @@ export const locationScenes = {
       'Original dark fantasy game environment concept art of haunted marshland with shallow water, ghostly reflections, reeds, green fog, and distant watchfires; no film stills, no text.',
   },
   'mount-doom': {
-    image: '/assets/locations/mount-doom-scene.svg',
+    image: publicAsset('/assets/locations/mount-doom-scene.svg'),
     focalPoint: '54% 50%',
     entryTitle: '火山裂隙前的終局判定',
     entryObjective: '抵達熔岩裂隙，在索倫視線下完成摧毀魔戒的最後步驟。',
@@ -107,62 +109,62 @@ export const locationScenes = {
 
 export const characterPortraits = {
   frodo: {
-    image: '/assets/characters/frodo-portrait.svg',
+    image: publicAsset('/assets/characters/frodo-portrait.svg'),
     prompt:
       'Original fantasy game portrait of a young halfling ringbearer with worried eyes, travel cloak, soft village colors; no actor likeness, no film stills, no text.',
   },
   sam: {
-    image: '/assets/characters/sam-portrait.svg',
+    image: publicAsset('/assets/characters/sam-portrait.svg'),
     prompt:
       'Original fantasy game portrait of a loyal halfling guardian with pack straps, practical cloak, warm expression, garden-earth palette; no actor likeness, no film stills, no text.',
   },
   aragorn: {
-    image: '/assets/characters/aragorn-portrait.svg',
+    image: publicAsset('/assets/characters/aragorn-portrait.svg'),
     prompt:
       'Original fantasy game portrait of a weathered ranger king, dark travel cloak, worn leather, noble but tired expression; no actor likeness, no film stills, no text.',
   },
   gandalf: {
-    image: '/assets/characters/gandalf-portrait.svg',
+    image: publicAsset('/assets/characters/gandalf-portrait.svg'),
     prompt:
       'Original fantasy game portrait of an ancient white wizard with long beard, staff glow, storm-gray eyes, high wisdom; no actor likeness, no film stills, no text.',
   },
   legolas: {
-    image: '/assets/characters/legolas-portrait.svg',
+    image: publicAsset('/assets/characters/legolas-portrait.svg'),
     prompt:
       'Original fantasy game portrait of an elven archer with pale hair, forest armor, calm focused gaze, teal and silver palette; no actor likeness, no film stills, no text.',
   },
   gimli: {
-    image: '/assets/characters/gimli-portrait.svg',
+    image: publicAsset('/assets/characters/gimli-portrait.svg'),
     prompt:
       'Original fantasy game portrait of a dwarf warrior with braided beard, bronze armor, axe silhouette, forge-warm light; no actor likeness, no film stills, no text.',
   },
   boromir: {
-    image: '/assets/characters/boromir-portrait.svg',
+    image: publicAsset('/assets/characters/boromir-portrait.svg'),
     prompt:
       'Original fantasy game portrait of a proud human captain in silver and dark leather armor, horn motif, conflicted expression; no actor likeness, no film stills, no text.',
   },
   faramir: {
-    image: '/assets/characters/faramir-portrait.svg',
+    image: publicAsset('/assets/characters/faramir-portrait.svg'),
     prompt:
       'Original fantasy game portrait of a thoughtful forest ranger captain, hooded green cloak, bow strap, restrained noble bearing; no actor likeness, no film stills, no text.',
   },
   theoden: {
-    image: '/assets/characters/theoden-portrait.svg',
+    image: publicAsset('/assets/characters/theoden-portrait.svg'),
     prompt:
       'Original fantasy game portrait of an aged horse-lord king in gold and green armor, wind-worn face, renewed resolve; no actor likeness, no film stills, no text.',
   },
   eowyn: {
-    image: '/assets/characters/eowyn-portrait.svg',
+    image: publicAsset('/assets/characters/eowyn-portrait.svg'),
     prompt:
       'Original fantasy game portrait of a shieldmaiden in pale armor and braided hair, determined gaze, cold morning battlefield light; no actor likeness, no film stills, no text.',
   },
   gollum: {
-    image: '/assets/characters/gollum-portrait.svg',
+    image: publicAsset('/assets/characters/gollum-portrait.svg'),
     prompt:
       'Original fantasy game portrait of a gaunt corrupted cave stalker with large reflective eyes, wet stone light, tragic menace; no film stills, no text.',
   },
   sauron: {
-    image: '/assets/characters/sauron-portrait.svg',
+    image: publicAsset('/assets/characters/sauron-portrait.svg'),
     prompt:
       'Original dark fantasy game portrait of an armored shadow lord represented by a burning eye-shaped visor, black iron crown silhouette, red fire glow; no film stills, no text.',
   },
