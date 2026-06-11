@@ -242,6 +242,85 @@ function AdventureTerrain() {
   );
 }
 
+function ExplorationFog({ progression }) {
+  if (!progression.exploration?.enabled) return null;
+
+  const unlockedIds = new Set(progression.exploration.unlockedLocationIds ?? []);
+  const currentId = progression.exploration.currentLocationId;
+  const visibleLocations = locations.filter((location) => unlockedIds.has(location.id) || location.id === currentId);
+
+  return (
+    <svg className="exploration-fog" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <mask id="explorationFogMask">
+          <rect width="100" height="100" fill="white" />
+          {visibleLocations.map((location) => (
+            <circle
+              key={location.id}
+              cx={location.x}
+              cy={location.y}
+              r={location.id === currentId ? 15 : 11}
+              fill="black"
+            />
+          ))}
+        </mask>
+      </defs>
+      <rect width="100" height="100" mask="url(#explorationFogMask)" />
+      {visibleLocations.map((location) => (
+        <circle
+          className={location.id === currentId ? 'fog-reveal current' : 'fog-reveal'}
+          key={location.id}
+          cx={location.x}
+          cy={location.y}
+          r={location.id === currentId ? 15 : 11}
+        />
+      ))}
+    </svg>
+  );
+}
+
+function ChapterCompleteOverlay({ summary, onContinue }) {
+  if (!summary) return null;
+
+  return (
+    <aside className="chapter-complete-overlay" aria-label="章節結算">
+      <div className="chapter-complete-card hud-panel">
+        <p>Chapter Complete</p>
+        <h2>{summary.locationName} 已完成</h2>
+        <span>{summary.encounterTitle ?? '區域事件已穩定'} / 節點掌控 {summary.nodeProgress * 20}%</span>
+        <div className="chapter-stat-grid">
+          <strong>
+            <small>Intel</small>
+            +{summary.intelGained}
+          </strong>
+          <strong>
+            <small>任務</small>
+            {summary.questAdvanced ? '推進' : '記錄'}
+          </strong>
+          <strong>
+            <small>隊伍 XP</small>
+            +{summary.characterRewards.reduce((total, reward) => total + reward.gainedXp, 0)}
+          </strong>
+        </div>
+        {summary.characterRewards.length > 0 && (
+          <div className="chapter-party-rewards">
+            {summary.characterRewards.slice(0, 4).map((reward) => (
+              <span key={reward.characterId}>{reward.name} +{reward.gainedXp} XP</span>
+            ))}
+          </div>
+        )}
+        {summary.explorationUnlockedLocationId && (
+          <div className="chapter-next-route">
+            <Sparkles size={17} />
+            <span>下一站解鎖：{locations.find((location) => location.id === summary.explorationUnlockedLocationId)?.zhName ?? summary.explorationUnlockedLocationId}</span>
+          </div>
+        )}
+        <button type="button" onClick={onContinue}>返回地圖</button>
+      </div>
+    </aside>
+  );
+}
+
 function QuestPanel({ activeQuest, setActiveQuest, highlightedCount, progression, focusedLocationId, explorationStatus, onSelectQuestLocation, onEnterQuestLocation, onResetProgression }) {
   const activeProgress = getQuestProgress(activeQuest.id, progression, quests);
   const nextLocationId = getNextQuestLocation(activeQuest, progression);
@@ -893,12 +972,18 @@ function AdventureMap({ onSwitchView }) {
   const [campaignLogOpen, setCampaignLogOpen] = useState(false);
   const [focusedQuestLocationId, setFocusedQuestLocationId] = useState(null);
   const [unlockAnimation, setUnlockAnimation] = useState(null);
+  const [chapterCompleteSummary, setChapterCompleteSummary] = useState(null);
   const [progression, setProgression] = useState(() => loadProgression(characters, locations, quests));
   const mapRef = useRef(null);
+  const chapterTimerRef = useRef(null);
 
   useEffect(() => {
     saveProgression(progression);
   }, [progression]);
+
+  useEffect(() => () => {
+    if (chapterTimerRef.current) window.clearTimeout(chapterTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (!progression.exploration?.enabled || activeQuest.id === 'ringbearer') return;
@@ -1050,7 +1135,7 @@ function AdventureMap({ onSwitchView }) {
     setSceneRewardSummary(rewardSummary);
     setActionPulse({ id: rewardSummary.id, actionId });
     if (rewardSummary.explorationUnlockedLocationId) {
-      handleExplorationUnlock(rewardSummary.explorationUnlockedLocationId);
+      triggerChapterComplete(rewardSummary);
     }
     window.setTimeout(() => setActionPulse(null), 820);
   };
@@ -1073,23 +1158,45 @@ function AdventureMap({ onSwitchView }) {
     setSceneRewardSummary(rewardSummary);
     setActionPulse({ id: rewardSummary.id, choiceId: resolvedChoice.id });
     if (rewardSummary.explorationUnlockedLocationId) {
-      handleExplorationUnlock(rewardSummary.explorationUnlockedLocationId);
+      triggerChapterComplete(rewardSummary);
     }
     window.setTimeout(() => setActionPulse(null), 820);
   };
 
+  const triggerChapterComplete = (rewardSummary) => {
+    if (chapterTimerRef.current) window.clearTimeout(chapterTimerRef.current);
+    setChapterCompleteSummary(rewardSummary);
+    chapterTimerRef.current = window.setTimeout(() => {
+      setChapterCompleteSummary(null);
+      setSceneRewardSummary(null);
+      handleExplorationUnlock(rewardSummary.explorationUnlockedLocationId);
+      chapterTimerRef.current = null;
+    }, 3200);
+  };
+
   const handleExplorationUnlock = (locationId) => {
     const unlockedLocation = locations.find((location) => location.id === locationId);
+    setSceneTransition('leaving');
     window.setTimeout(() => {
       setSceneLocationId(null);
-      setSceneRewardSummary(null);
       setSceneTransition('entering');
       setActiveSceneNodeId('entry');
       setActionPulse(null);
-      focusLocationOnMap(locationId);
       setUnlockAnimation({ id: `${Date.now()}-${locationId}`, locationId, locationName: unlockedLocation?.zhName ?? locationId });
+      focusLocationOnMap(locationId);
       window.setTimeout(() => setUnlockAnimation(null), 2600);
-    }, 780);
+    }, 520);
+  };
+
+  const handleContinueChapterComplete = () => {
+    const nextLocationId = chapterCompleteSummary?.explorationUnlockedLocationId;
+    if (chapterTimerRef.current) {
+      window.clearTimeout(chapterTimerRef.current);
+      chapterTimerRef.current = null;
+    }
+    setChapterCompleteSummary(null);
+    setSceneRewardSummary(null);
+    if (nextLocationId) handleExplorationUnlock(nextLocationId);
   };
 
   const handleSelectSceneNode = (nodeId) => {
@@ -1099,6 +1206,11 @@ function AdventureMap({ onSwitchView }) {
   };
 
   const handleCloseScene = () => {
+    if (chapterTimerRef.current) {
+      window.clearTimeout(chapterTimerRef.current);
+      chapterTimerRef.current = null;
+    }
+    setChapterCompleteSummary(null);
     setSceneTransition('leaving');
     window.setTimeout(() => {
       setSceneLocationId(null);
@@ -1111,9 +1223,14 @@ function AdventureMap({ onSwitchView }) {
 
   const handleResetProgression = () => {
     if (!window.confirm('確定要重置所有角色 XP、地點情報與任務進度嗎？')) return;
+    if (chapterTimerRef.current) {
+      window.clearTimeout(chapterTimerRef.current);
+      chapterTimerRef.current = null;
+    }
     resetProgressionStorage();
     setProgression(createDefaultProgression(characters, locations, quests));
     setSceneRewardSummary(null);
+    setChapterCompleteSummary(null);
   };
 
   const handleToggleExplorationMode = () => {
@@ -1155,7 +1272,7 @@ function AdventureMap({ onSwitchView }) {
     <main className="adventure-shell">
       <div
         ref={mapRef}
-        className={`adventure-map ${dragState ? 'dragging' : ''}`}
+        className={`adventure-map ${progression.exploration?.enabled ? 'exploration-active' : ''} ${dragState ? 'dragging' : ''}`}
         role="application"
         aria-label="沉浸式中土 MMORPG 地圖，可拖曳與縮放"
         onPointerDown={handleMapPointerDown}
@@ -1174,6 +1291,7 @@ function AdventureMap({ onSwitchView }) {
               <polyline points={routePoints} />
             </svg>
           )}
+          <ExplorationFog progression={progression} />
 
           <span className="world-label west">Eriador</span>
           <span className="world-label north">Rhovanion</span>
@@ -1366,6 +1484,7 @@ function AdventureMap({ onSwitchView }) {
           onClose={handleCloseScene}
         />
       )}
+      <ChapterCompleteOverlay summary={chapterCompleteSummary} onContinue={handleContinueChapterComplete} />
     </main>
   );
 }

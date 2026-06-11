@@ -108,6 +108,40 @@
   will-change: transform;
 }
 
+.adventure-map.exploration-active {
+  background:
+    radial-gradient(circle at 12% 38%, rgba(102, 140, 76, 0.62), transparent 18%),
+    radial-gradient(circle at 52% 46%, rgba(58, 96, 89, 0.38), transparent 20%),
+    radial-gradient(circle at 82% 68%, rgba(115, 38, 34, 0.46), transparent 24%),
+    linear-gradient(130deg, #071011 0%, #17241d 28%, #222f28 52%, #251d19 78%, #070809 100%);
+}
+
+.exploration-fog {
+  position: absolute;
+  z-index: 7;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.exploration-fog rect {
+  fill: rgba(1, 4, 5, 0.74);
+}
+
+.fog-reveal {
+  fill: none;
+  stroke: rgba(241, 203, 111, 0.24);
+  stroke-width: 0.45;
+  filter: drop-shadow(0 0 8px rgba(246, 202, 108, 0.28));
+}
+
+.fog-reveal.current {
+  stroke: rgba(120, 190, 165, 0.55);
+  stroke-width: 0.7;
+  animation: fogRevealPulse 2400ms ease-in-out infinite;
+}
+
 .adventure-map::before,
 .adventure-map::after {
   content: '';
@@ -1250,7 +1284,7 @@
 
 .adventure-marker {
   position: absolute;
-  z-index: 8;
+  z-index: 9;
   width: 44px;
   height: 44px;
   display: grid;
@@ -2372,6 +2406,129 @@
   font-weight: 900;
 }
 
+.chapter-complete-overlay {
+  position: fixed;
+  z-index: 78;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(246, 202, 108, 0.24), transparent 24%),
+    radial-gradient(circle at 50% 50%, rgba(120, 190, 165, 0.12), transparent 42%),
+    rgba(2, 4, 5, 0.72);
+  backdrop-filter: blur(5px) saturate(1.08);
+  animation: chapterOverlayEnter 420ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+}
+
+.chapter-complete-card {
+  width: min(560px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+  text-align: center;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(246, 202, 108, 0.22), transparent 36%),
+    linear-gradient(180deg, rgba(19, 24, 23, 0.96), rgba(8, 10, 10, 0.97));
+  animation: chapterCardEnter 520ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+}
+
+.chapter-complete-card p,
+.chapter-complete-card h2,
+.chapter-complete-card span {
+  margin: 0;
+}
+
+.chapter-complete-card p {
+  color: #d6a95d;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.chapter-complete-card h2 {
+  color: #fff0c7;
+  font-size: clamp(2rem, 5vw, 3.6rem);
+  line-height: 0.98;
+}
+
+.chapter-complete-card > span {
+  color: #cde7d2;
+  font-size: 0.92rem;
+  font-weight: 900;
+  line-height: 1.45;
+}
+
+.chapter-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.chapter-stat-grid strong {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid rgba(246, 202, 108, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+  color: #f4cf79;
+  font-size: 1rem;
+}
+
+.chapter-stat-grid small {
+  color: #c3b590;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.chapter-party-rewards,
+.chapter-next-route {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 7px;
+}
+
+.chapter-party-rewards span {
+  width: auto;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border: 1px solid rgba(245, 205, 122, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #f4dfaf;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.chapter-next-route {
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(120, 190, 165, 0.32);
+  border-radius: 8px;
+  background: rgba(120, 190, 165, 0.11);
+  color: #dff1bd;
+  font-weight: 900;
+}
+
+.chapter-next-route svg {
+  color: #f0c15f;
+}
+
+.chapter-complete-card button {
+  min-height: 42px;
+  border: 1px solid rgba(246, 202, 108, 0.5);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(189, 118, 50, 0.72), rgba(82, 52, 26, 0.82));
+  color: #fff0c7;
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
 .scene-objectives {
   flex-direction: column;
 }
@@ -2556,6 +2713,37 @@
   }
 }
 
+@keyframes fogRevealPulse {
+  0%, 100% {
+    opacity: 0.48;
+    stroke-width: 0.62;
+  }
+  50% {
+    opacity: 1;
+    stroke-width: 1;
+  }
+}
+
+@keyframes chapterOverlayEnter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes chapterCardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .scene-overlay,
   .scene-overlay.leaving,
@@ -2566,6 +2754,9 @@
   .character-panel,
   .adventure-marker.unlocking .marker-core,
   .unlock-toast,
+  .fog-reveal.current,
+  .chapter-complete-overlay,
+  .chapter-complete-card,
   .scene-action-card.resolved,
   .scene-reward-summary.reward-pop {
     animation: none;
@@ -2715,6 +2906,15 @@
     border-left: 0;
     box-shadow: 0 -24px 56px rgba(0, 0, 0, 0.44);
   }
+
+  .chapter-complete-overlay {
+    align-items: start;
+    overflow: auto;
+  }
+
+  .chapter-complete-card {
+    margin: 6vh 0;
+  }
 }
 
 @media (max-width: 640px) {
@@ -2798,6 +2998,23 @@
     top: 34px;
     max-width: 94px;
     font-size: 0.68rem;
+  }
+
+  .chapter-complete-overlay {
+    padding: 12px;
+  }
+
+  .chapter-complete-card {
+    gap: 11px;
+    padding: 16px;
+  }
+
+  .chapter-stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chapter-complete-card h2 {
+    font-size: 2rem;
   }
 
   .scene-overlay {
