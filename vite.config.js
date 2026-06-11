@@ -7,4 +7,7 @@ const isGitHubPages = process.env.GITHUB_ACTIONS === 'true';
 export default defineConfig({
   plugins: [react()],
   base: isGitHubPages ? `/${repoName}/` : '/',
+  build: {
+    chunkSizeWarningLimit: 900,
+  },
 });

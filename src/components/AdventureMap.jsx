@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Castle,
   ChevronRight,
@@ -80,8 +80,23 @@ const MAP_MIN_ZOOM = 0.85;
 const MAP_MAX_ZOOM = 2.3;
 const MAP_ZOOM_STEP = 0.18;
 const FOCUS_ZOOM = 1.42;
+let threePreloadPromise = null;
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+const normalizeAngle = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle));
+
+function getDirectionLabel(angle) {
+  const absAngle = Math.abs(angle);
+  if (absAngle < 0.42) return '正前方';
+  if (absAngle > 2.68) return '後方';
+  return angle > 0 ? '右前方' : '左前方';
+}
+
+function preloadThree() {
+  if (!threePreloadPromise) threePreloadPromise = import('three');
+  return threePreloadPromise;
+}
 
 function getCharacterPortrait(characterId) {
   return characterPortraits[characterId]?.image ?? null;
@@ -124,6 +139,13 @@ function getSceneNodes(location) {
       y: 58,
     },
   ];
+}
+
+function sceneNodeToWorldPosition(node) {
+  return {
+    x: ((node.x - 50) / 50) * 11,
+    z: ((node.y - 50) / 50) * 12,
+  };
 }
 
 function getActivePartyPower(activeParty, location) {
@@ -597,14 +619,383 @@ function ProgressMeter({ label, value, maxValue, detail }) {
   );
 }
 
+function SceneWalkthrough3D({ location, scene, sceneNodes, activeSceneNodeId, progression, onSelectSceneNode, onPlayerPoseChange, onNearbyNodeChange }) {
+  const mountRef = useRef(null);
+  const keysRef = useRef(new Set());
+  const playerRef = useRef({ x: 0, z: 7, yaw: 0 });
+  const pointerLookRef = useRef(null);
+  const nearNodeRef = useRef(null);
+  const activeNodeRef = useRef(null);
+  const nodeObjectsRef = useRef([]);
+  const lastHudRef = useRef({ activeDistance: null, targetAngle: 0, targetLabel: '正前方' });
+  const onSelectSceneNodeRef = useRef(onSelectSceneNode);
+  const onPlayerPoseChangeRef = useRef(onPlayerPoseChange);
+  const onNearbyNodeChangeRef = useRef(onNearbyNodeChange);
+  const [nearNodeId, setNearNodeId] = useState(null);
+  const [activeDistance, setActiveDistance] = useState(null);
+  const [targetDirection, setTargetDirection] = useState({ angle: 0, label: '正前方' });
+  const activeNode = sceneNodes.find((node) => node.id === activeSceneNodeId) ?? sceneNodes[0];
+
+  useEffect(() => {
+    onSelectSceneNodeRef.current = onSelectSceneNode;
+    onPlayerPoseChangeRef.current = onPlayerPoseChange;
+    onNearbyNodeChangeRef.current = onNearbyNodeChange;
+  }, [onNearbyNodeChange, onPlayerPoseChange, onSelectSceneNode]);
+
+  useEffect(() => {
+    activeNodeRef.current = activeNode;
+    nodeObjectsRef.current.forEach(({ node, pillar, ring }) => {
+      const completion = getSceneNodeCompletion(location.id, node.id, progression);
+      const active = node.id === activeNode.id;
+      pillar.material.color.setHex(completion.complete ? 0x78be7a : active ? 0xf0c15f : 0x60736a);
+      pillar.material.emissive.setHex(completion.complete ? 0x244d22 : active ? 0x6a4310 : 0x10201c);
+      pillar.material.emissiveIntensity = active ? 0.58 : 0.28;
+      ring.scale.setScalar(active ? 1.18 : 1);
+    });
+  }, [activeNode, location.id, progression]);
+
+  useEffect(() => {
+    const mount = mountRef.current;
+    if (!mount) return undefined;
+    let disposed = false;
+    let cleanupScene = () => {};
+
+    preloadThree().then((THREE) => {
+      if (disposed || !mountRef.current) return;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(mount.clientWidth, mount.clientHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    mount.appendChild(renderer.domElement);
+
+    const threeScene = new THREE.Scene();
+    threeScene.fog = new THREE.FogExp2(location.danger === '極高' ? 0x24100c : 0x0b1211, 0.032);
+
+    const camera = new THREE.PerspectiveCamera(62, mount.clientWidth / Math.max(1, mount.clientHeight), 0.1, 120);
+    const ambient = new THREE.HemisphereLight(0xf6dfad, 0x152018, 1.8);
+    const keyLight = new THREE.DirectionalLight(location.danger === '極高' ? 0xff7b45 : 0xffdf9a, 2.2);
+    keyLight.position.set(-5, 8, 6);
+    threeScene.add(ambient, keyLight);
+
+    const groundMaterial = new THREE.MeshStandardMaterial({ color: location.danger === '低' ? 0x314c2c : location.danger === '極高' ? 0x3a1d17 : 0x2b3830, roughness: 0.95 });
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(42, 42, 18, 18), groundMaterial);
+    ground.rotation.x = -Math.PI / 2;
+    threeScene.add(ground);
+
+    const ringMaterial = new THREE.MeshStandardMaterial({ color: 0xd0a85c, emissive: 0x5a3a12, emissiveIntensity: 0.24, roughness: 0.58 });
+    const nodeObjects = sceneNodes.map((node, index) => {
+      const completion = getSceneNodeCompletion(location.id, node.id, progression);
+      const worldPosition = sceneNodeToWorldPosition(node);
+      const group = new THREE.Group();
+      group.position.set(worldPosition.x, 0, worldPosition.z);
+
+      const pillar = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.28, 0.42, 1.65, 14),
+        new THREE.MeshStandardMaterial({
+          color: completion.complete ? 0x78be7a : node.id === activeSceneNodeId ? 0xf0c15f : 0x60736a,
+          emissive: completion.complete ? 0x244d22 : node.id === activeSceneNodeId ? 0x6a4310 : 0x10201c,
+          emissiveIntensity: node.id === activeSceneNodeId ? 0.52 : 0.28,
+          roughness: 0.65,
+        }),
+      );
+      pillar.position.y = 0.82;
+      group.add(pillar);
+
+      if (node.id === 'entry') {
+        const arch = new THREE.Mesh(new THREE.TorusGeometry(0.68, 0.06, 8, 22, Math.PI), ringMaterial);
+        arch.position.y = 1.48;
+        arch.rotation.z = Math.PI;
+        group.add(arch);
+      }
+
+      if (node.id === 'landmark') {
+        const obelisk = new THREE.Mesh(
+          new THREE.ConeGeometry(0.34, 1.25, 4),
+          new THREE.MeshStandardMaterial({ color: 0xd8c17a, emissive: 0x4f3a10, emissiveIntensity: 0.32, roughness: 0.54 }),
+        );
+        obelisk.position.y = 2.05;
+        obelisk.rotation.y = Math.PI / 4;
+        group.add(obelisk);
+      }
+
+      if (node.id === 'danger') {
+        const spikeMaterial = new THREE.MeshStandardMaterial({ color: 0x8f2f25, emissive: 0x3f0806, emissiveIntensity: 0.5, roughness: 0.62 });
+        [-0.48, 0.48].forEach((offset) => {
+          const spike = new THREE.Mesh(new THREE.ConeGeometry(0.16, 1.1, 8), spikeMaterial);
+          spike.position.set(offset, 1.25, 0.2);
+          spike.rotation.z = offset > 0 ? -0.28 : 0.28;
+          group.add(spike);
+        });
+      }
+
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.045, 8, 26), ringMaterial);
+      ring.position.y = 1.78;
+      ring.rotation.x = Math.PI / 2;
+      group.add(ring);
+
+      threeScene.add(group);
+      return { node, group, pillar, ring };
+    });
+    nodeObjectsRef.current = nodeObjects;
+
+    const landmarkMaterial = new THREE.MeshStandardMaterial({ color: 0x76664b, roughness: 0.88 });
+    for (let index = 0; index < 14; index += 1) {
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.35 + (index % 3) * 0.16), landmarkMaterial);
+      const angle = index * 1.92;
+      const radius = 9 + (index % 4) * 1.6;
+      rock.position.set(Math.cos(angle) * radius, 0.28, Math.sin(angle) * radius);
+      rock.rotation.set(index * 0.2, index * 0.45, 0);
+      threeScene.add(rock);
+    }
+
+    const trunkMaterial = new THREE.MeshStandardMaterial({ color: location.danger === '極高' ? 0x251714 : 0x4a3325, roughness: 0.9 });
+    const leafMaterial = new THREE.MeshStandardMaterial({ color: location.danger === '低' ? 0x4f7c3d : 0x2f5645, roughness: 0.86 });
+    const ruinMaterial = new THREE.MeshStandardMaterial({ color: location.danger === '極高' ? 0x4c2a21 : 0x6a6253, roughness: 0.82 });
+    const fireMaterial = new THREE.MeshStandardMaterial({ color: 0xff8a3d, emissive: 0xff5a1f, emissiveIntensity: 1.2, roughness: 0.42 });
+    const propGroup = new THREE.Group();
+
+    const treeCount = location.danger === '極高' ? 5 : 12;
+    for (let index = 0; index < treeCount; index += 1) {
+      const angle = index * 2.37 + 0.4;
+      const radius = 6.5 + (index % 5) * 2.2;
+      const tree = new THREE.Group();
+      tree.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 1.5 + (index % 3) * 0.26, 8), trunkMaterial);
+      trunk.position.y = 0.75;
+      tree.add(trunk);
+      const crown = new THREE.Mesh(new THREE.ConeGeometry(0.62 + (index % 2) * 0.18, 1.55, 9), leafMaterial);
+      crown.position.y = 1.95;
+      tree.add(crown);
+      propGroup.add(tree);
+    }
+
+    for (let index = 0; index < 10; index += 1) {
+      const angle = index * 1.31 + 0.8;
+      const radius = 4.8 + (index % 4) * 1.4;
+      const columnHeight = 0.85 + (index % 3) * 0.38;
+      const column = new THREE.Mesh(new THREE.BoxGeometry(0.34, columnHeight, 0.34), ruinMaterial);
+      column.position.set(Math.cos(angle) * radius, columnHeight / 2, Math.sin(angle) * radius - 0.5);
+      column.rotation.y = angle;
+      propGroup.add(column);
+    }
+
+    for (let index = 0; index < 9; index += 1) {
+      const stone = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.08, 0.34), landmarkMaterial);
+      stone.position.set(-3.5 + index * 0.86, 0.04, 3.1 - index * 0.7);
+      stone.rotation.y = index * 0.34;
+      propGroup.add(stone);
+    }
+
+    sceneNodes.forEach((node, index) => {
+      const worldPosition = sceneNodeToWorldPosition(node);
+      const torch = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.16, 0.92, 8), trunkMaterial);
+      torch.position.set(worldPosition.x + 0.72, 0.46, worldPosition.z + 0.52);
+      const flame = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 8), fireMaterial);
+      flame.position.set(torch.position.x, 1.06, torch.position.z);
+      propGroup.add(torch, flame);
+    });
+
+    threeScene.add(propGroup);
+
+    const player = playerRef.current;
+    let frameId = 0;
+    let lastTime = performance.now();
+    let walkTime = 0;
+    let lastPosePublish = 0;
+
+    const handleKeyDown = (event) => {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyE'].includes(event.code)) {
+        event.preventDefault();
+      }
+      if (event.code === 'KeyE') {
+        const currentNear = nodeObjectsRef.current.find(({ node }) => node.id === nearNodeRef.current)?.node;
+        if (currentNear) onSelectSceneNodeRef.current(currentNear.id);
+      }
+      keysRef.current.add(event.code);
+    };
+
+    const handleKeyUp = (event) => {
+      keysRef.current.delete(event.code);
+    };
+
+    const handlePointerDown = (event) => {
+      pointerLookRef.current = { pointerId: event.pointerId, x: event.clientX, yaw: player.yaw };
+      renderer.domElement.setPointerCapture(event.pointerId);
+    };
+
+    const handlePointerMove = (event) => {
+      const pointerLook = pointerLookRef.current;
+      if (!pointerLook || pointerLook.pointerId !== event.pointerId) return;
+      player.yaw = pointerLook.yaw - (event.clientX - pointerLook.x) * 0.006;
+    };
+
+    const handlePointerUp = (event) => {
+      if (pointerLookRef.current?.pointerId === event.pointerId) pointerLookRef.current = null;
+    };
+
+    const resize = () => {
+      const width = mount.clientWidth;
+      const height = Math.max(1, mount.clientHeight);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('resize', resize);
+    renderer.domElement.addEventListener('pointerdown', handlePointerDown);
+    renderer.domElement.addEventListener('pointermove', handlePointerMove);
+    renderer.domElement.addEventListener('pointerup', handlePointerUp);
+    renderer.domElement.addEventListener('pointercancel', handlePointerUp);
+
+    const animate = (time) => {
+      const delta = Math.min(0.05, (time - lastTime) / 1000);
+      lastTime = time;
+      const keys = keysRef.current;
+      const speed = 4.4 * delta;
+
+      const forward = Number(keys.has('ArrowUp') || keys.has('KeyW')) - Number(keys.has('ArrowDown') || keys.has('KeyS'));
+      const strafe = Number(keys.has('ArrowRight') || keys.has('KeyD')) - Number(keys.has('ArrowLeft') || keys.has('KeyA'));
+      const moving = forward !== 0 || strafe !== 0;
+      const forwardX = Math.sin(player.yaw);
+      const forwardZ = -Math.cos(player.yaw);
+      const rightX = Math.cos(player.yaw);
+      const rightZ = Math.sin(player.yaw);
+      player.x += (forwardX * forward + rightX * strafe) * speed;
+      player.z += (forwardZ * forward + rightZ * strafe) * speed;
+      walkTime += moving ? delta * 8 : 0;
+      player.x = clamp(player.x, -12, 12);
+      player.z = clamp(player.z, -13, 13);
+
+      let closest = null;
+      let closestDistance = Infinity;
+      nodeObjects.forEach(({ node, group }, index) => {
+        group.rotation.y += delta * (0.42 + index * 0.08);
+        const distance = Math.hypot(group.position.x - player.x, group.position.z - player.z);
+        if (distance < closestDistance) {
+          closest = node.id;
+          closestDistance = distance;
+        }
+      });
+      const nextNearNodeId = closestDistance <= 2.4 ? closest : null;
+      if (nearNodeRef.current !== nextNearNodeId) {
+        nearNodeRef.current = nextNearNodeId;
+        setNearNodeId(nextNearNodeId);
+      }
+
+      const bob = moving ? Math.sin(walkTime) * 0.035 : 0;
+      camera.position.set(player.x, 1.65 + bob, player.z);
+      camera.lookAt(player.x + Math.sin(player.yaw) * 8, 1.45 + bob, player.z - Math.cos(player.yaw) * 8);
+      if (time - lastPosePublish > 120) {
+        lastPosePublish = time;
+        const currentActiveNode = activeNodeRef.current ?? sceneNodes[0];
+        const activeWorldPosition = sceneNodeToWorldPosition(currentActiveNode);
+        const nextActiveDistance = Math.hypot(activeWorldPosition.x - player.x, activeWorldPosition.z - player.z);
+        const targetBearing = Math.atan2(activeWorldPosition.x - player.x, -(activeWorldPosition.z - player.z));
+        const targetAngle = normalizeAngle(targetBearing - player.yaw);
+        const targetLabel = getDirectionLabel(targetAngle);
+        const lastHud = lastHudRef.current;
+        if (
+          lastHud.activeDistance === null
+          || Math.abs(lastHud.activeDistance - nextActiveDistance) > 0.12
+          || Math.abs(normalizeAngle(lastHud.targetAngle - targetAngle)) > 0.12
+          || lastHud.targetLabel !== targetLabel
+        ) {
+          lastHudRef.current = { activeDistance: nextActiveDistance, targetAngle, targetLabel };
+          setActiveDistance(nextActiveDistance);
+          setTargetDirection({ angle: targetAngle, label: targetLabel });
+        }
+        onPlayerPoseChangeRef.current({ x: player.x, z: player.z, yaw: player.yaw, activeDistance: nextActiveDistance });
+        onNearbyNodeChangeRef.current({ nodeId: nextNearNodeId, distance: closestDistance });
+      }
+      renderer.render(threeScene, camera);
+      frameId = window.requestAnimationFrame(animate);
+    };
+
+    resize();
+    frameId = window.requestAnimationFrame(animate);
+
+    cleanupScene = () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('resize', resize);
+      renderer.domElement.removeEventListener('pointerdown', handlePointerDown);
+      renderer.domElement.removeEventListener('pointermove', handlePointerMove);
+      renderer.domElement.removeEventListener('pointerup', handlePointerUp);
+      renderer.domElement.removeEventListener('pointercancel', handlePointerUp);
+      renderer.dispose();
+      nodeObjectsRef.current = [];
+      if (renderer.domElement.parentElement === mount) mount.removeChild(renderer.domElement);
+    };
+    });
+
+    return () => {
+      disposed = true;
+      cleanupScene();
+    };
+  }, [location, sceneNodes]);
+
+  const nearNode = sceneNodes.find((node) => node.id === nearNodeId);
+
+  return (
+    <div className="scene-3d-shell">
+      {scene.image && <img className="scene-3d-backdrop" src={scene.image} alt="" style={{ objectPosition: scene.focalPoint }} />}
+      <div className="scene-portal-transition" aria-hidden="true">
+        <span />
+      </div>
+      <div ref={mountRef} className="scene-3d-canvas" aria-label={`${location.zhName} 3D 探索場景`} />
+      <span className="scene-3d-reticle" aria-hidden="true" />
+      <div className="scene-3d-hud">
+        <strong>3D Explore</strong>
+        <span>目標：{activeNode?.title ?? '未標記'}{activeDistance !== null ? ` / ${activeDistance.toFixed(1)}m` : ''}</span>
+        <span className="scene-3d-direction"><i style={{ transform: `rotate(${targetDirection.angle}rad)` }} />{targetDirection.label}</span>
+        <span>WASD / 方向鍵移動，拖曳畫面轉向</span>
+        <span>靠近信標按 E 選取事件點</span>
+      </div>
+      {nearNode && (
+        <button className="scene-3d-prompt" type="button" onClick={() => onSelectSceneNode(nearNode.id)}>
+          進入：{nearNode.title}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function SceneOverlay({ location, relatedCharacters, activeParty, activeQuest, progression, rewardSummary, transitionState, activeSceneNodeId, actionPulse, onSelectSceneNode, onApplyAction, onResolveChoice, onClose }) {
   const toneClass = sceneToneClass[location.danger] ?? 'scene-watch';
   const scene = getLocationScene(location.id);
-  const sceneNodes = getSceneNodes(location);
+  const sceneNodes = useMemo(() => getSceneNodes(location), [location]);
+  const [scenePlayerPose, setScenePlayerPose] = useState({ x: 0, z: 7, yaw: 0 });
+  const [nearbySceneNode, setNearbySceneNode] = useState({ nodeId: null, distance: Infinity });
+  const handlePlayerPoseChange = useCallback((pose) => {
+    setScenePlayerPose((current) => {
+      const moved = Math.abs(current.x - pose.x) > 0.18 || Math.abs(current.z - pose.z) > 0.18;
+      const turned = Math.abs(normalizeAngle(current.yaw - pose.yaw)) > 0.08;
+      return moved || turned ? pose : current;
+    });
+  }, []);
+  const handleNearbyNodeChange = useCallback((next) => {
+    setNearbySceneNode((current) => {
+      const nodeChanged = current.nodeId !== next.nodeId;
+      const distanceChanged = Math.abs((current.distance ?? Infinity) - next.distance) > 0.18;
+      return nodeChanged || distanceChanged ? next : current;
+    });
+  }, []);
   const activeSceneNode = sceneNodes.find((node) => node.id === activeSceneNodeId) ?? sceneNodes[0];
+  const activeNodeReachable = nearbySceneNode.nodeId === activeSceneNode.id;
+  const nearestNode = sceneNodes.find((node) => node.id === nearbySceneNode.nodeId);
   const encounter = getSceneEncounter({ location, sceneNode: activeSceneNode, activeQuest, activeParty, progression });
   const actions = getSceneActions({ location, activeQuest, activeParty, progression, encounter });
   const partyPower = getActivePartyPower(activeParty, location);
+
+  useEffect(() => {
+    if (nearbySceneNode.nodeId && nearbySceneNode.nodeId !== activeSceneNodeId) {
+      onSelectSceneNode(nearbySceneNode.nodeId);
+    }
+  }, [activeSceneNodeId, nearbySceneNode.nodeId, onSelectSceneNode]);
 
   return (
     <div className={`scene-overlay ${toneClass} ${transitionState}`} role="dialog" aria-modal="true" aria-labelledby="scene-title">
@@ -614,27 +1005,17 @@ function SceneOverlay({ location, relatedCharacters, activeParty, activeQuest, p
           <X size={20} />
           <span>返回地圖</span>
         </button>
-        <div className={`scene-stage ${scene.image ? 'has-scene-art' : ''}`} aria-hidden="true">
-          {scene.image ? (
-            <img className="scene-art" src={scene.image} alt="" style={{ objectPosition: scene.focalPoint }} />
-          ) : (
-            <>
-              <div className="scene-sky" />
-              <div className="scene-sun" />
-              <div className="scene-mountains">
-                <span />
-                <span />
-                <span />
-              </div>
-              <div className="scene-ground" />
-              <div className="scene-party">
-                <i />
-                <i />
-                <i />
-              </div>
-              <div className="scene-fire" />
-            </>
-          )}
+        <div className={`scene-stage ${scene.image ? 'has-scene-art' : ''}`}>
+          <SceneWalkthrough3D
+            location={location}
+            scene={scene}
+            sceneNodes={sceneNodes}
+            activeSceneNodeId={activeSceneNodeId}
+            progression={progression}
+            onSelectSceneNode={onSelectSceneNode}
+            onPlayerPoseChange={handlePlayerPoseChange}
+            onNearbyNodeChange={handleNearbyNodeChange}
+          />
           <div className="scene-party-strip">
             {activeParty.slice(0, 4).map(({ character, status }) => {
               const portrait = getCharacterPortrait(character.id);
@@ -648,6 +1029,15 @@ function SceneOverlay({ location, relatedCharacters, activeParty, activeQuest, p
             })}
           </div>
           <div className="scene-node-map" aria-label="場景小地圖">
+            <span
+              className="scene-player-marker"
+              style={{
+                left: `${clamp(((scenePlayerPose.x + 12) / 24) * 100, 8, 92)}%`,
+                top: `${clamp(((scenePlayerPose.z + 13) / 26) * 100, 8, 92)}%`,
+                transform: `translate(-50%, -50%) rotate(${scenePlayerPose.yaw}rad)`,
+              }}
+              aria-hidden="true"
+            />
             {sceneNodes.map((node) => (
               (() => {
                 const completion = getSceneNodeCompletion(location.id, node.id, progression);
@@ -687,7 +1077,7 @@ function SceneOverlay({ location, relatedCharacters, activeParty, activeQuest, p
             <h3>{activeSceneNode.title}</h3>
             <strong>{activeSceneNode.label}</strong>
             <p>{encounter.briefing}</p>
-            <small>{activeSceneNode.actionHint}</small>
+            <small>{activeNodeReachable ? activeSceneNode.actionHint : nearestNode ? `靠近「${nearestNode.title}」後可調查，目前距離 ${nearbySceneNode.distance.toFixed(1)}` : '先在 3D 場景中靠近任一信標。'}</small>
           </section>
           <section className="encounter-card" aria-label="目前場景事件">
             <div className="encounter-heading">
@@ -742,12 +1132,16 @@ function SceneOverlay({ location, relatedCharacters, activeParty, activeQuest, p
           </div>
           <section className="scene-action-board">
             <h3>事件抉擇</h3>
+            {!activeNodeReachable && (
+              <p className="scene-proximity-note">請先走到「{activeSceneNode.title}」信標旁，才能執行此節點事件。</p>
+            )}
             <div className="choice-grid">
               {encounter.choices.map((choice) => (
                 <button
                   type="button"
                   key={choice.id}
                   className={`encounter-choice-card ${choice.recommended ? 'recommended' : ''} ${actionPulse?.choiceId === choice.id ? 'resolved' : ''}`}
+                  disabled={!activeNodeReachable}
                   onClick={() => onResolveChoice(choice)}
                 >
                   <strong>
@@ -777,7 +1171,7 @@ function SceneOverlay({ location, relatedCharacters, activeParty, activeQuest, p
                 type="button"
                 key={action.id}
                 className={`scene-action-card ${actionPulse?.actionId === action.id ? 'resolved' : ''}`}
-                disabled={!action.enabled}
+                disabled={!activeNodeReachable || !action.enabled}
                 onClick={() => onApplyAction(action.id)}
               >
                 <strong>
@@ -785,7 +1179,7 @@ function SceneOverlay({ location, relatedCharacters, activeParty, activeQuest, p
                   {action.recommended && <em>推薦</em>}
                 </strong>
                 <span>{action.description}</span>
-                <small>{action.enabled ? `${action.result} / 成功率 ${action.successChance}%` : action.disabledReason}</small>
+                <small>{!activeNodeReachable ? '尚未靠近目前節點' : action.enabled ? `${action.result} / 成功率 ${action.successChance}%` : action.disabledReason}</small>
               </button>
             ))}
           </section>
@@ -1143,6 +1537,7 @@ function AdventureMap({ onSwitchView }) {
 
   const handleEnterLocation = () => {
     if (selectedExplorationStatus.locked) return;
+    preloadThree();
     setSceneTransition('entering');
     setSceneLocationId(selectedLocation.id);
     setSceneRewardSummary(null);
@@ -1152,6 +1547,7 @@ function AdventureMap({ onSwitchView }) {
 
   const handleEnterQuestLocation = (locationId) => {
     if (getExplorationStatus(progression, locationId).locked) return;
+    preloadThree();
     focusLocationOnMap(locationId);
     setSceneTransition('entering');
     setSceneLocationId(locationId);
@@ -1414,7 +1810,7 @@ function AdventureMap({ onSwitchView }) {
             <LibraryBig size={16} />
             <span>戰役日誌</span>
           </button>
-          <button className="hud-button" type="button" onClick={handleEnterLocation}>
+          <button className="hud-button" type="button" onPointerEnter={preloadThree} onFocus={preloadThree} onClick={handleEnterLocation}>
             <DoorOpen size={16} />
             <span>{selectedExplorationStatus.locked ? '尚未解鎖' : '進入地點'}</span>
           </button>
