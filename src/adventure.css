@@ -386,6 +386,57 @@
   max-width: min(390px, calc(100vw - 36px));
 }
 
+.party-resource-hud {
+  position: fixed;
+  z-index: 21;
+  left: 50%;
+  top: 18px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(92px, 1fr));
+  gap: 8px;
+  padding: 8px;
+  transform: translateX(-50%);
+}
+
+.resource-pill {
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border: 1px solid rgba(245, 205, 122, 0.18);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.resource-pill small {
+  overflow: hidden;
+  color: #c3b590;
+  font-size: 0.62rem;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.resource-pill strong {
+  color: #fff0c7;
+  font-size: 1rem;
+}
+
+.resource-pill.hope {
+  border-color: rgba(120, 190, 165, 0.3);
+}
+
+.resource-pill.fatigue {
+  border-color: rgba(246, 202, 108, 0.28);
+}
+
+.resource-pill.corruption {
+  border-color: rgba(220, 83, 72, 0.32);
+}
+
 .map-icon-button,
 .hud-toggle {
   min-height: 38px;
@@ -432,6 +483,47 @@
 
 .drag-hint {
   color: #cbbd9d;
+}
+
+.resource-delta-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.resource-delta-list.compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.resource-delta-list span {
+  min-width: 0;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 7px;
+  overflow: hidden;
+  border: 1px solid rgba(245, 205, 122, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+  color: #d8c79c;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resource-delta-list span.positive {
+  border-color: rgba(127, 202, 116, 0.34);
+  background: rgba(48, 96, 49, 0.18);
+  color: #cde7d2;
+}
+
+.resource-delta-list span.negative {
+  border-color: rgba(220, 83, 72, 0.34);
+  background: rgba(117, 32, 29, 0.2);
+  color: #f1b79f;
 }
 
 .quest-panel {
@@ -2802,6 +2894,7 @@
   .adventure-topbar,
   .map-control-panel,
   .hud-toggle-panel,
+  .party-resource-hud,
   .quest-panel,
   .location-panel,
   .character-panel,
@@ -2842,6 +2935,11 @@
   .hud-toggle-panel {
     transform: none;
     justify-content: flex-start;
+  }
+
+  .party-resource-hud {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    transform: none;
   }
 
   .adventure-topbar {
@@ -2926,6 +3024,7 @@
   .adventure-topbar,
   .map-control-panel,
   .hud-toggle-panel,
+  .party-resource-hud,
   .quest-panel,
   .location-panel,
   .character-panel,
@@ -2959,6 +3058,12 @@
   .hud-toggle-panel {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .party-resource-hud,
+  .resource-delta-list,
+  .resource-delta-list.compact {
+    grid-template-columns: 1fr;
   }
 
   .party-bar {

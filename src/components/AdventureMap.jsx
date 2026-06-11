@@ -302,6 +302,7 @@ function ChapterCompleteOverlay({ summary, onContinue }) {
             +{summary.characterRewards.reduce((total, reward) => total + reward.gainedXp, 0)}
           </strong>
         </div>
+        <ResourceDeltaList delta={summary.resourceDelta} resources={summary.partyResources} compact />
         {summary.characterRewards.length > 0 && (
           <div className="chapter-party-rewards">
             {summary.characterRewards.slice(0, 4).map((reward) => (
@@ -318,6 +319,44 @@ function ChapterCompleteOverlay({ summary, onContinue }) {
         <button type="button" onClick={onContinue}>返回地圖</button>
       </div>
     </aside>
+  );
+}
+
+function formatDelta(value) {
+  if (value > 0) return `+${value}`;
+  return `${value}`;
+}
+
+function ResourceDeltaList({ delta, resources, compact = false }) {
+  if (!delta || !resources) return null;
+
+  return (
+    <div className={compact ? 'resource-delta-list compact' : 'resource-delta-list'} aria-label="隊伍資源變化">
+      <span className={delta.hope >= 0 ? 'positive' : 'negative'}>希望 {formatDelta(delta.hope)} / {resources.hope}</span>
+      <span className={delta.fatigue <= 0 ? 'positive' : 'negative'}>疲勞 {formatDelta(delta.fatigue)} / {resources.fatigue}</span>
+      <span className={delta.corruption <= 0 ? 'positive' : 'negative'}>腐化 {formatDelta(delta.corruption)} / {resources.corruption}</span>
+    </div>
+  );
+}
+
+function PartyResourceHud({ resources }) {
+  const safeResources = resources ?? { hope: 0, fatigue: 0, corruption: 0 };
+
+  return (
+    <section className="party-resource-hud hud-panel" aria-label="隊伍資源">
+      <span className="resource-pill hope">
+        <small>Hope</small>
+        <strong>{safeResources.hope}</strong>
+      </span>
+      <span className="resource-pill fatigue">
+        <small>Fatigue</small>
+        <strong>{safeResources.fatigue}</strong>
+      </span>
+      <span className="resource-pill corruption">
+        <small>Corruption</small>
+        <strong>{safeResources.corruption}</strong>
+      </span>
+    </section>
   );
 }
 
@@ -787,6 +826,7 @@ function SceneOverlay({ location, relatedCharacters, activeParty, activeQuest, p
                   <strong>{rewardSummary.questAdvanced ? '已推進' : '已記錄'}</strong>
                 </span>
               </div>
+              <ResourceDeltaList delta={rewardSummary.resourceDelta} resources={rewardSummary.partyResources} />
               <div className="reward-character-list">
                 {rewardSummary.characterRewards.map((reward) => (
                   <span key={reward.characterId}>
@@ -932,6 +972,7 @@ function CampaignLogDrawer({ open, logEntries, onClear, onClose }) {
               <span>掌控 +{entry.nodeProgressGained}</span>
               <span>{entry.questAdvanced ? '任務推進' : '任務記錄'}</span>
             </div>
+            <ResourceDeltaList delta={entry.resourceDelta} resources={entry.partyResources} compact />
             {entry.contributors?.length > 0 && (
               <div className="campaign-log-tags">
                 {entry.contributors.map((contributor) => (
@@ -1342,6 +1383,8 @@ function AdventureMap({ onSwitchView }) {
           </div>
         </div>
       )}
+
+      <PartyResourceHud resources={progression.partyResources} />
 
       <header className="adventure-topbar hud-panel">
         <div>

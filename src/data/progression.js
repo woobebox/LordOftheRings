@@ -39,6 +39,11 @@ export const locationMasteryStages = [
 
 const maxCharacterXp = characterStages.at(-1).minXp;
 const maxLocationIntel = locationMasteryStages.at(-1).minIntel;
+const defaultPartyResources = {
+  hope: 72,
+  fatigue: 18,
+  corruption: 8,
+};
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -111,6 +116,7 @@ export function createDefaultProgression(characters, locations, quests) {
       unlockedLocationIds: [EXPLORATION_ROUTE[0]],
       currentLocationId: EXPLORATION_ROUTE[0],
     },
+    partyResources: { ...defaultPartyResources },
     campaignLog: [],
     lastReward: null,
   };
@@ -195,10 +201,21 @@ function normalizeProgression(rawState, characters, locations, quests) {
       }),
     ),
     exploration: normalizeExploration(source.exploration, defaults.exploration, locations),
+    partyResources: normalizePartyResources(source.partyResources),
     campaignLog: Array.isArray(source.campaignLog)
       ? source.campaignLog.filter((entry) => entry && typeof entry === 'object').slice(0, MAX_CAMPAIGN_LOG_ENTRIES)
       : [],
     lastReward: source.lastReward ?? null,
+  };
+}
+
+function normalizePartyResources(rawResources) {
+  const source = rawResources && typeof rawResources === 'object' ? rawResources : defaultPartyResources;
+
+  return {
+    hope: clamp(Number(source.hope) || defaultPartyResources.hope, 0, 100),
+    fatigue: clamp(Number(source.fatigue) || 0, 0, 100),
+    corruption: clamp(Number(source.corruption) || 0, 0, 100),
   };
 }
 
@@ -405,6 +422,8 @@ function appendCampaignLog(nextState, rewardSummary) {
     contributors: rewardSummary.choiceContributors ?? [],
     intelGained: rewardSummary.intelGained,
     nodeProgressGained: rewardSummary.nodeProgressGained,
+    resourceDelta: rewardSummary.resourceDelta,
+    partyResources: rewardSummary.partyResources,
     questAdvanced: rewardSummary.questAdvanced,
     characterRewards: rewardSummary.characterRewards,
     unlocks: rewardSummary.unlocks,
@@ -412,6 +431,68 @@ function appendCampaignLog(nextState, rewardSummary) {
   };
 
   nextState.campaignLog = [entry, ...(nextState.campaignLog ?? [])].slice(0, MAX_CAMPAIGN_LOG_ENTRIES);
+}
+
+function applyPartyResourceDelta(nextState, delta) {
+  const current = nextState.partyResources ?? { ...defaultPartyResources };
+  nextState.partyResources = {
+    hope: clamp(current.hope + delta.hope, 0, 100),
+    fatigue: clamp(current.fatigue + delta.fatigue, 0, 100),
+    corruption: clamp(current.corruption + delta.corruption, 0, 100),
+  };
+}
+
+function getPartyResourceDelta({ choice, resolvedActionId, successTier, isRecommended, encounter, questAdvanced }) {
+  const riskScore = encounter?.riskScore ?? 2;
+  const rewardMode = choice?.rewardMode ?? (resolvedActionId === 'advance-quest' ? 'quest' : resolvedActionId === 'party-bond' ? 'party' : 'intel');
+  const delta = {
+    hope: questAdvanced ? 3 : 0,
+    fatigue: Math.max(1, riskScore),
+    corruption: riskScore >= 3 ? 1 : 0,
+  };
+
+  if (isRecommended) {
+    delta.hope += 1;
+    delta.fatigue -= 1;
+  } else {
+    delta.fatigue += 1;
+  }
+
+  if (successTier === 'strong') {
+    delta.hope += 2;
+    delta.fatigue -= 1;
+  }
+
+  if (successTier === 'risky') {
+    delta.hope -= 2;
+    delta.fatigue += 2;
+    delta.corruption += rewardMode === 'party' || rewardMode === 'story' ? 2 : 1;
+  }
+
+  if (rewardMode === 'stability') {
+    delta.fatigue -= 3;
+  }
+
+  if (rewardMode === 'party') {
+    delta.hope += 1;
+    delta.corruption -= successTier === 'risky' ? 0 : 1;
+  }
+
+  if (rewardMode === 'story') {
+    delta.hope += 1;
+    delta.corruption += riskScore >= 3 ? 1 : 0;
+  }
+
+  if (rewardMode === 'quest') {
+    delta.hope += questAdvanced ? 2 : 0;
+    delta.fatigue += 1;
+  }
+
+  return {
+    hope: clamp(delta.hope, -8, 8),
+    fatigue: clamp(delta.fatigue, -6, 10),
+    corruption: clamp(delta.corruption, -4, 8),
+  };
 }
 
 export function clearCampaignLog(state) {
@@ -580,6 +661,8 @@ export function applySceneActionReward(state, actionId, { location, activeQuest,
   }
 
   questProgress.milestone = Math.round((questProgress.completedLocationIds.length / activeQuest.locationIds.length) * 100);
+  const resourceDelta = getPartyResourceDelta({ choice, resolvedActionId, successTier, isRecommended, encounter, questAdvanced });
+  applyPartyResourceDelta(nextState, resourceDelta);
   const explorationUnlockedLocationId = syncExplorationWithQuestProgress(nextState, activeQuest, unlocks);
 
   const rewardSummary = {
@@ -608,6 +691,8 @@ export function applySceneActionReward(state, actionId, { location, activeQuest,
     wasRecommended: isRecommended,
     nodeProgressGained,
     nodeProgress: sceneNode?.progress ?? 0,
+    resourceDelta,
+    partyResources: nextState.partyResources,
     explorationUnlockedLocationId,
     characterRewards,
     unlocks,
