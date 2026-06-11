@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1536 1024" role="img" aria-label="Original fantasy golden forest sanctuary scene">
+  <defs><linearGradient id="bg" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#23362e"/><stop offset="1" stop-color="#090f0d"/></linearGradient><radialGradient id="moon" cx="48%" cy="24%" r="42%"><stop stop-color="#f7e4a0" stop-opacity=".54"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient></defs>
+  <rect width="1536" height="1024" fill="url(#bg)"/><rect width="1536" height="1024" fill="url(#moon)"/>
+  <g stroke="#d8c48e" stroke-width="28" stroke-linecap="round" opacity=".74"><path d="M214 1024C206 692 252 398 354 142"/><path d="M598 1024c-34-346 10-642 132-888"/><path d="M980 1024c44-330 26-612-54-846"/><path d="M1310 1024c-24-286 18-532 126-738"/></g>
+  <g fill="#d9aa4e" opacity=".82"><circle cx="292" cy="250" r="86"/><circle cx="494" cy="186" r="58"/><circle cx="790" cy="246" r="112"/><circle cx="1114" cy="220" r="78"/><circle cx="1268" cy="342" r="90"/></g>
+  <path d="M498 542h574l-74 118H568Z" fill="#a77845"/><path d="M560 504h430l50 50H514Z" fill="#ead28f" opacity=".76"/>
+  <path d="M0 814c246-74 474-80 684-18 210 62 494 40 852-66v294H0Z" fill="#07100d" opacity=".8"/>
+  <g fill="#fff1b5" opacity=".7"><circle cx="418" cy="618" r="10"/><circle cx="808" cy="438" r="12"/><circle cx="1162" cy="596" r="9"/><circle cx="1020" cy="720" r="11"/></g>
+</svg>

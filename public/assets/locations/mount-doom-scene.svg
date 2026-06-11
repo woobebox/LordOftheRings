@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1536 1024" role="img" aria-label="Original fantasy volcanic mountain scene">
+  <defs><linearGradient id="ash" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#2a1718"/><stop offset="1" stop-color="#050303"/></linearGradient><radialGradient id="lava" cx="56%" cy="58%" r="45%"><stop stop-color="#ff8a2c" stop-opacity=".72"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient></defs>
+  <rect width="1536" height="1024" fill="url(#ash)"/><rect width="1536" height="1024" fill="url(#lava)"/>
+  <path d="M0 740 286 436l190 156 286-432 260 428 170-132 344 306v262H0Z" fill="#100d0d"/>
+  <path d="M764 208 998 762H514Z" fill="#24191a"/><path d="M760 260c44 160 30 314-42 462h126c-54-150-60-304-18-462Z" fill="#ff5a27" opacity=".82"/>
+  <path d="M0 834c230-56 446-62 648-18 272 60 568 40 888-60v268H0Z" fill="#090606"/>
+  <g fill="#ffb347" opacity=".76"><path d="M112 846c124 26 236 18 336-24 78-32 174-30 288 8-162 52-370 60-624 16Z"/><path d="M892 820c150 24 278 14 384-30 58-24 122-18 192 18-166 70-358 74-576 12Z"/></g>
+  <g fill="#c4422d" opacity=".5"><circle cx="382" cy="246" r="72"/><circle cx="1054" cy="178" r="98"/><circle cx="1242" cy="322" r="60"/></g>
+</svg>

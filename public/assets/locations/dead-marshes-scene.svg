@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1536 1024" role="img" aria-label="Original fantasy haunted marshland scene">
+  <defs><linearGradient id="fog" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#34423e"/><stop offset="1" stop-color="#050807"/></linearGradient><radialGradient id="ghost" cx="48%" cy="62%" r="52%"><stop stop-color="#9ed8a5" stop-opacity=".34"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient></defs>
+  <rect width="1536" height="1024" fill="url(#fog)"/><rect width="1536" height="1024" fill="url(#ghost)"/>
+  <path d="M0 662c238-72 460-64 666 24 206 88 496 76 870-36v374H0Z" fill="#101a15"/>
+  <path d="M0 746c292-34 552-24 780 30 220 52 472 44 756-24v180H0Z" fill="#243c35" opacity=".72"/>
+  <g stroke="#6f8c75" stroke-width="10" stroke-linecap="round" opacity=".72"><path d="M164 754c24-98 12-178-36-240"/><path d="M306 806c12-112 42-204 90-276"/><path d="M1118 802c-14-108 8-198 66-270"/><path d="M1300 770c40-86 44-160 12-222"/></g>
+  <g fill="#bde8c0" opacity=".38"><ellipse cx="522" cy="820" rx="92" ry="28"/><ellipse cx="862" cy="772" rx="120" ry="34"/><ellipse cx="1096" cy="858" rx="84" ry="26"/></g>
+  <g fill="#e7a852"><circle cx="234" cy="514" r="15"/><circle cx="1230" cy="536" r="18"/></g>
+</svg>

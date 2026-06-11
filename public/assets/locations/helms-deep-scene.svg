@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1536 1024" role="img" aria-label="Original fantasy mountain fortress under storm scene">
+  <defs><linearGradient id="storm" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#26313b"/><stop offset="1" stop-color="#0b0d10"/></linearGradient></defs>
+  <rect width="1536" height="1024" fill="url(#storm)"/>
+  <path d="M0 612 284 178l226 434 238-520 284 526 210-346 294 360v392H0Z" fill="#11161b"/>
+  <path d="M250 674h1016v350H250Z" fill="#2d3338"/><path d="M316 560h870v148H316Z" fill="#555f66"/><path d="M414 466h150v242H414Z" fill="#65717a"/><path d="M950 430h176v278H950Z" fill="#65717a"/>
+  <g fill="#1a1f24"><rect x="360" y="598" width="54" height="110"/><rect x="488" y="598" width="54" height="110"/><rect x="616" y="598" width="54" height="110"/><rect x="744" y="598" width="54" height="110"/><rect x="872" y="598" width="54" height="110"/><rect x="1000" y="598" width="54" height="110"/></g>
+  <path d="M0 806c260-70 530-88 810-54 258 32 500 20 726-36v308H0Z" fill="#060809" opacity=".78"/>
+  <g fill="#e9a746"><circle cx="396" cy="714" r="18"/><circle cx="552" cy="718" r="18"/><circle cx="708" cy="718" r="18"/><circle cx="864" cy="718" r="18"/><circle cx="1020" cy="714" r="18"/></g>
+  <path d="M1148 132 1038 330h96l-84 178 194-256h-104Z" fill="#d6e6ff" opacity=".68"/>
+</svg>

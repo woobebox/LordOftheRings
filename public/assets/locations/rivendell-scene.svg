@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1536 1024" role="img" aria-label="Original fantasy elven valley refuge scene">
+  <defs><linearGradient id="sky" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#38505b"/><stop offset="1" stop-color="#d8aa69"/></linearGradient><linearGradient id="water" x1="0" x2="1"><stop stop-color="#bfe9e4"/><stop offset="1" stop-color="#467e89"/></linearGradient></defs>
+  <rect width="1536" height="1024" fill="url(#sky)"/>
+  <path d="M0 604 260 214l230 396 240-480 300 472 218-334 288 372v384H0Z" fill="#18252a"/>
+  <path d="M420 214c34 226 10 390-72 492-68 84-94 184-78 318h140c-34-136-8-244 76-324 102-98 134-260 92-486Z" fill="url(#water)" opacity=".9"/>
+  <path d="M694 378h420l76 274H600Z" fill="#6d4d35" opacity=".88"/><path d="M652 396l260-160 286 160Z" fill="#b87745"/>
+  <path d="M752 490h306v188H752z" fill="#31433e"/><path d="M0 792c204-88 408-118 612-90 236 32 452 2 648-90 118-56 210-58 276-6v418H0Z" fill="#0e1a1a" opacity=".78"/>
+  <g stroke="#f0cf83" stroke-width="8" opacity=".58" fill="none"><path d="M616 668c166-54 340-48 522 18"/><path d="M666 724c142-38 290-32 444 18"/></g>
+  <g fill="#e2b466"><circle cx="235" cy="716" r="36"/><circle cx="1280" cy="618" r="46"/><circle cx="1130" cy="740" r="28"/></g>
+</svg>

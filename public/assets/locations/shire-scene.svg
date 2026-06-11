@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1536 1024" role="img" aria-label="Original fantasy green hill village scene">
+  <defs>
+    <linearGradient id="sky" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#89b8a6"/><stop offset="1" stop-color="#efe1ad"/></linearGradient>
+    <linearGradient id="hill" x1="0" x2="1"><stop stop-color="#345d36"/><stop offset="1" stop-color="#8ca94e"/></linearGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="10"/></filter>
+  </defs>
+  <rect width="1536" height="1024" fill="url(#sky)"/>
+  <circle cx="1210" cy="190" r="96" fill="#ffe8a7" opacity=".8"/>
+  <path d="M-80 754C268 526 544 618 828 506c228-90 426-78 812 96v422H-80Z" fill="url(#hill)"/>
+  <path d="M108 828c174-118 334-144 500-82 132 48 242 42 390-18 166-68 338-52 542 82v214H108Z" fill="#233f2d" opacity=".78"/>
+  <ellipse cx="455" cy="610" rx="230" ry="132" fill="#5c8544"/>
+  <path d="M250 614c54-98 142-148 246-146 104 2 174 52 224 150Z" fill="#344b33"/>
+  <circle cx="472" cy="626" r="66" fill="#a36f3e" stroke="#f5d78b" stroke-width="14"/>
+  <circle cx="472" cy="626" r="40" fill="#2f563a"/>
+  <path d="M746 674h250v116H746z" fill="#775030"/><path d="M704 672l166-102 172 102Z" fill="#4f372d"/>
+  <path d="M0 912c218-96 416-104 594-24 242 108 480 84 706-44 102-58 202-76 300-50v230H0Z" fill="#13201b" opacity=".64"/>
+  <g fill="#f0d58b" opacity=".72" filter="url(#soft)"><circle cx="174" cy="390" r="36"/><circle cx="270" cy="350" r="24"/><circle cx="1170" cy="456" r="30"/></g>
+</svg>

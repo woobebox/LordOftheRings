@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1536 1024" role="img" aria-label="Original fantasy white tiered mountain city scene">
+  <defs><linearGradient id="sky" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#8fb0bd"/><stop offset="1" stop-color="#f1d093"/></linearGradient></defs>
+  <rect width="1536" height="1024" fill="url(#sky)"/>
+  <path d="M842 86 1258 1024H444Z" fill="#3f464a"/><path d="M502 784h650v112H502z" fill="#d8d6c8"/><path d="M550 672h540v112H550z" fill="#eeeada"/><path d="M604 562h430v110H604z" fill="#d9d9d0"/><path d="M658 454h324v108H658z" fill="#f4efe1"/><path d="M710 350h226v104H710z" fill="#dcd8c8"/><path d="M768 238h116v112H768z" fill="#fff6df"/>
+  <g fill="#7f8c91"><rect x="570" y="704" width="44" height="80"/><rect x="716" y="704" width="44" height="80"/><rect x="862" y="704" width="44" height="80"/><rect x="1008" y="704" width="44" height="80"/></g>
+  <path d="M0 806c244-84 526-90 846-18 286 64 516 54 690-30v266H0Z" fill="#1e261f" opacity=".72"/>
+  <circle cx="236" cy="186" r="96" fill="#ffe6a7" opacity=".78"/>
+</svg>

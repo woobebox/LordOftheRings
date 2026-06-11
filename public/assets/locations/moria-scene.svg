@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1536 1024" role="img" aria-label="Original fantasy abandoned underground dwarf hall scene">
+  <defs><linearGradient id="cave" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#172027"/><stop offset="1" stop-color="#050709"/></linearGradient><radialGradient id="glow" cx="50%" cy="58%" r="46%"><stop stop-color="#6fb0bc" stop-opacity=".42"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient></defs>
+  <rect width="1536" height="1024" fill="url(#cave)"/><rect width="1536" height="1024" fill="url(#glow)"/>
+  <g fill="#26333a"><path d="M90 0h120v1024H90z"/><path d="M362 0h138v1024H362z"/><path d="M690 0h156v1024H690z"/><path d="M1064 0h146v1024h-146z"/><path d="M1340 0h116v1024h-116z"/></g>
+  <g fill="#11191e"><path d="M0 730h1536v294H0z"/><path d="M0 590c246 46 498 52 754 18 284-38 544-24 782 42v140H0Z"/></g>
+  <path d="M476 678c176-36 380-34 614 6l-42 68c-194-24-372-24-532 0Z" fill="#67747a"/>
+  <path d="M662 408h216l56 202H602Z" fill="#1b252a" stroke="#7592a0" stroke-width="10" opacity=".9"/>
+  <g stroke="#80c9d7" stroke-width="8" opacity=".8"><path d="M508 216v270"/><path d="M1010 180v304"/></g>
+  <circle cx="514" cy="502" r="34" fill="#8ee7f2" opacity=".7"/><circle cx="1014" cy="502" r="34" fill="#8ee7f2" opacity=".7"/>
+</svg>
