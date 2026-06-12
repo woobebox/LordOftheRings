@@ -28,10 +28,12 @@ import {
 } from 'lucide-react';
 import { characterPortraits, fallbackScene, locationScenes } from '../data/assets.js';
 import { characters } from '../data/characters.js';
+import { getCharacterVisual } from '../data/characterVisuals.js';
 import { getSceneEncounter, getSceneNodeCompletion } from '../data/encounters.js';
 import { factions, journeyRoute, locations } from '../data/locations.js';
 import {
   applySceneActionReward,
+  applySceneCharacterInteractionReward,
   clearCampaignLog,
   createDefaultProgression,
   EXPLORATION_ROUTE,
@@ -42,6 +44,7 @@ import {
   getNextQuestLocation,
   getQuestProgress,
   getSceneActions,
+  getSceneCharacterInteraction,
   loadProgression,
   resetProgressionStorage,
   saveProgression,
@@ -145,6 +148,98 @@ function sceneNodeToWorldPosition(node) {
   return {
     x: ((node.x - 50) / 50) * 11,
     z: ((node.y - 50) / 50) * 12,
+  };
+}
+
+const characterSceneSlots = [
+  { x: -4.8, z: 4.2 },
+  { x: -1.8, z: 2.8 },
+  { x: 2.4, z: 3.4 },
+  { x: 5.1, z: 1.2 },
+];
+
+const characterNameAliases = {
+  佛羅多: 'frodo',
+  山姆: 'sam',
+  亞拉岡: 'aragorn',
+  甘道夫: 'gandalf',
+  勒苟拉斯: 'legolas',
+  金靂: 'gimli',
+  波羅莫: 'boromir',
+  法拉墨: 'faramir',
+  希優頓: 'theoden',
+  伊歐玟: 'eowyn',
+  咕嚕: 'gollum',
+  索倫: 'sauron',
+  戒靈: 'sauron',
+  戒靈之王: 'sauron',
+  炎魔: 'sauron',
+  薩魯曼: 'sauron',
+};
+
+function buildSceneCharacters(location, relatedCharacters, activeParty) {
+  const namedPeople = location.people ?? [];
+  const byName = new Map(characters.flatMap((character) => [
+    [character.zhName, character],
+    [character.enName, character],
+  ]));
+  const explicitCharacters = namedPeople
+    .map((name) => byName.get(name) ?? characters.find((character) => character.id === characterNameAliases[name]))
+    .filter(Boolean)
+    .map((character) => ({ character, source: '地點人物', priority: 100 + character.level }));
+  const activeSupplements = activeParty
+    .filter(({ character }) => character.relatedLocations.includes(location.id))
+    .map(({ character }) => ({ character, source: '隊伍在場', priority: 70 + character.level }));
+  const fallback = relatedCharacters
+    .slice(0, 2)
+    .map((character) => ({ character, source: '地點關聯', priority: 40 + character.level }));
+  const unique = [];
+  const seen = new Set();
+  [...explicitCharacters, ...activeSupplements, ...fallback].forEach((entry) => {
+    if (seen.has(entry.character.id)) return;
+    seen.add(entry.character.id);
+    unique.push(entry);
+  });
+
+  return unique
+    .sort((a, b) => b.priority - a.priority || b.character.level - a.character.level)
+    .slice(0, characterSceneSlots.length)
+    .map((entry, index) => ({
+    ...entry,
+    id: entry.character.id,
+    portrait: getCharacterPortrait(entry.character.id),
+    position: characterSceneSlots[index],
+  }));
+}
+
+function getCharacterDialogue(character, location, interaction) {
+  const repeated = interaction?.talks > 0;
+  const visual = getCharacterVisual(character.id);
+  const lineByArchetype = {
+    Survivor: `「${location.zhName} 的路不會自己變安全，但我們可以一步一步走完。」`,
+    Guardian: `「先顧好隊伍，其他事情才有機會完成。」`,
+    'Ranger King': `「這裡的風向、足跡和沉默，都在告訴我們該避開哪條路。」`,
+    Istari: `「${location.zhName} 的危險不只在眼前，也藏在每個錯誤決定後面。」`,
+    Marksman: `「我能看見遠處的動靜。若要行動，最好先知道誰正在看著我們。」`,
+    Berserker: `「若這裡藏著古老的石廳或敵人的喉嚨，我都知道該往哪裡劈。」`,
+    Captain: `「戰場從來不只靠勇氣，還要知道何時推進、何時穩住。」`,
+    Warden: `「我會判斷這裡的風險，但我們不能讓魔戒替我們下判斷。」`,
+    'War Leader': `「士氣一旦穩住，隊伍就能承受比想像中更長的黑夜。」`,
+    Shieldmaiden: `「不要把恐懼當成命令。它只是另一個需要跨過的門檻。」`,
+    Stalker: `「好路、壞路，我都知道。只是代價不一定由我付。」`,
+    'Raid Boss': `「有一道目光穿過此地。你能走近，但未必能完整離開。」`,
+  };
+
+  return {
+    line: repeated
+      ? `「我們已談過這裡。但${location.zhName} 還有些細節值得再確認。」`
+      : visual.locationLines?.[location.id] ?? visual.fallbackLine ?? lineByArchetype[character.archetype] ?? `「${location.zhName} 有它自己的規則。先聽，再行動。」`,
+    intel: character.relatedLocations.includes(location.id)
+      ? `${character.zhName} 對此地有直接關聯，情報收益較高。`
+      : `${character.zhName} 可提供隊伍視角，但不一定熟悉此地。`,
+    support: interaction?.helped
+      ? '此角色已在本地點提供過支援。'
+      : '請求支援會明顯影響 Hope、Fatigue 或 Corruption。',
   };
 }
 
@@ -619,19 +714,24 @@ function ProgressMeter({ label, value, maxValue, detail }) {
   );
 }
 
-function SceneWalkthrough3D({ location, scene, sceneNodes, activeSceneNodeId, progression, onSelectSceneNode, onPlayerPoseChange, onNearbyNodeChange }) {
+function SceneWalkthrough3D({ location, scene, sceneNodes, sceneCharacters, activeSceneNodeId, progression, actionPulse, onSelectSceneNode, onPlayerPoseChange, onNearbyNodeChange, onNearbyCharacterChange, onInteractCharacter }) {
   const mountRef = useRef(null);
   const keysRef = useRef(new Set());
   const playerRef = useRef({ x: 0, z: 7, yaw: 0 });
   const pointerLookRef = useRef(null);
   const nearNodeRef = useRef(null);
+  const nearCharacterRef = useRef(null);
   const activeNodeRef = useRef(null);
   const nodeObjectsRef = useRef([]);
+  const characterObjectsRef = useRef([]);
   const lastHudRef = useRef({ activeDistance: null, targetAngle: 0, targetLabel: '正前方' });
   const onSelectSceneNodeRef = useRef(onSelectSceneNode);
   const onPlayerPoseChangeRef = useRef(onPlayerPoseChange);
   const onNearbyNodeChangeRef = useRef(onNearbyNodeChange);
+  const onNearbyCharacterChangeRef = useRef(onNearbyCharacterChange);
+  const onInteractCharacterRef = useRef(onInteractCharacter);
   const [nearNodeId, setNearNodeId] = useState(null);
+  const [nearCharacterId, setNearCharacterId] = useState(null);
   const [activeDistance, setActiveDistance] = useState(null);
   const [targetDirection, setTargetDirection] = useState({ angle: 0, label: '正前方' });
   const activeNode = sceneNodes.find((node) => node.id === activeSceneNodeId) ?? sceneNodes[0];
@@ -640,7 +740,9 @@ function SceneWalkthrough3D({ location, scene, sceneNodes, activeSceneNodeId, pr
     onSelectSceneNodeRef.current = onSelectSceneNode;
     onPlayerPoseChangeRef.current = onPlayerPoseChange;
     onNearbyNodeChangeRef.current = onNearbyNodeChange;
-  }, [onNearbyNodeChange, onPlayerPoseChange, onSelectSceneNode]);
+    onNearbyCharacterChangeRef.current = onNearbyCharacterChange;
+    onInteractCharacterRef.current = onInteractCharacter;
+  }, [onInteractCharacter, onNearbyCharacterChange, onNearbyNodeChange, onPlayerPoseChange, onSelectSceneNode]);
 
   useEffect(() => {
     activeNodeRef.current = activeNode;
@@ -653,6 +755,14 @@ function SceneWalkthrough3D({ location, scene, sceneNodes, activeSceneNodeId, pr
       ring.scale.setScalar(active ? 1.18 : 1);
     });
   }, [activeNode, location.id, progression]);
+
+  useEffect(() => {
+    characterObjectsRef.current.forEach(({ entry, contactGlow }) => {
+      const active = actionPulse?.characterId === entry.character.id;
+      contactGlow.material.opacity = active ? 0.84 : 0.32;
+      contactGlow.scale.setScalar(active ? 1.38 : 1);
+    });
+  }, [actionPulse]);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -798,6 +908,74 @@ function SceneWalkthrough3D({ location, scene, sceneNodes, activeSceneNodeId, pr
 
     threeScene.add(propGroup);
 
+    const textureLoader = new THREE.TextureLoader();
+    const characterObjects = sceneCharacters.map((entry) => {
+      const group = new THREE.Group();
+      group.position.set(entry.position.x, 0, entry.position.z);
+      const visual = getCharacterVisual(entry.character.id);
+      const tintColor = new THREE.Color(visual.tint);
+      const accentColor = new THREE.Color(visual.accent);
+      const baseMaterial = new THREE.MeshStandardMaterial({ color: tintColor, emissive: tintColor, emissiveIntensity: 0.16, roughness: 0.68 });
+      const accentMaterial = new THREE.MeshStandardMaterial({ color: accentColor, emissive: accentColor, emissiveIntensity: 0.28, roughness: 0.48 });
+
+      const base = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.46, 0.62, 0.12, 18),
+        baseMaterial,
+      );
+      base.position.y = 0.08;
+      group.add(base);
+
+      const backing = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.05, 1.46),
+        new THREE.MeshBasicMaterial({ color: tintColor, transparent: true, opacity: 0.36, side: THREE.DoubleSide }),
+      );
+      backing.position.set(0, 1.12, -0.02);
+      group.add(backing);
+
+      if (entry.portrait) {
+        const texture = textureLoader.load(entry.portrait);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        const portrait = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.96, 1.24),
+          new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide }),
+        );
+        portrait.position.set(0, 1.14, 0.04);
+        group.add(portrait);
+      } else {
+        const marker = new THREE.Mesh(
+          new THREE.CapsuleGeometry(0.28, 0.74, 6, 12),
+          baseMaterial,
+        );
+        marker.position.y = 1.02;
+        group.add(marker);
+      }
+
+      const propHeight = visual.prop === 'bow' ? 1.12 : visual.prop === 'axe' ? 0.82 : visual.prop === 'staff' ? 1.34 : 0.72;
+      const prop = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.026, propHeight, 8), accentMaterial);
+      prop.position.set(0.56, 0.88, 0.08);
+      prop.rotation.z = visual.prop === 'bow' ? Math.PI / 2.6 : visual.prop === 'axe' ? -0.58 : 0.12;
+      group.add(prop);
+
+      if (visual.prop === 'ring' || visual.prop === 'eye' || visual.prop === 'glowing-eyes') {
+        const emblem = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.018, 8, 24), accentMaterial);
+        emblem.position.set(0, 1.76, 0.08);
+        emblem.rotation.x = Math.PI / 2;
+        group.add(emblem);
+      }
+
+      const contactGlow = new THREE.Mesh(
+        new THREE.TorusGeometry(0.62, 0.035, 8, 32),
+        new THREE.MeshBasicMaterial({ color: accentColor, transparent: true, opacity: 0.32 }),
+      );
+      contactGlow.position.y = 0.18;
+      contactGlow.rotation.x = Math.PI / 2;
+      group.add(contactGlow);
+
+      threeScene.add(group);
+      return { entry, group, backing, contactGlow };
+    });
+    characterObjectsRef.current = characterObjects;
+
     const player = playerRef.current;
     let frameId = 0;
     let lastTime = performance.now();
@@ -809,6 +987,11 @@ function SceneWalkthrough3D({ location, scene, sceneNodes, activeSceneNodeId, pr
         event.preventDefault();
       }
       if (event.code === 'KeyE') {
+        const currentCharacter = characterObjectsRef.current.find(({ entry }) => entry.id === nearCharacterRef.current)?.entry;
+        if (currentCharacter) {
+          onInteractCharacterRef.current(currentCharacter.character.id, 'talk');
+          return;
+        }
         const currentNear = nodeObjectsRef.current.find(({ node }) => node.id === nearNodeRef.current)?.node;
         if (currentNear) onSelectSceneNodeRef.current(currentNear.id);
       }
@@ -885,6 +1068,24 @@ function SceneWalkthrough3D({ location, scene, sceneNodes, activeSceneNodeId, pr
         setNearNodeId(nextNearNodeId);
       }
 
+      let closestCharacter = null;
+      let closestCharacterDistance = Infinity;
+      characterObjects.forEach(({ entry, group, backing, contactGlow }, index) => {
+        group.lookAt(camera.position.x, group.position.y, camera.position.z);
+        backing.position.y = 1.12 + Math.sin(time * 0.002 + index) * 0.025;
+        contactGlow.rotation.z += delta * (0.75 + index * 0.06);
+        const distance = Math.hypot(group.position.x - player.x, group.position.z - player.z);
+        if (distance < closestCharacterDistance) {
+          closestCharacter = entry.id;
+          closestCharacterDistance = distance;
+        }
+      });
+      const nextNearCharacterId = closestCharacterDistance <= 2.2 ? closestCharacter : null;
+      if (nearCharacterRef.current !== nextNearCharacterId) {
+        nearCharacterRef.current = nextNearCharacterId;
+        setNearCharacterId(nextNearCharacterId);
+      }
+
       const bob = moving ? Math.sin(walkTime) * 0.035 : 0;
       camera.position.set(player.x, 1.65 + bob, player.z);
       camera.lookAt(player.x + Math.sin(player.yaw) * 8, 1.45 + bob, player.z - Math.cos(player.yaw) * 8);
@@ -909,6 +1110,7 @@ function SceneWalkthrough3D({ location, scene, sceneNodes, activeSceneNodeId, pr
         }
         onPlayerPoseChangeRef.current({ x: player.x, z: player.z, yaw: player.yaw, activeDistance: nextActiveDistance });
         onNearbyNodeChangeRef.current({ nodeId: nextNearNodeId, distance: closestDistance });
+        onNearbyCharacterChangeRef.current({ characterId: nextNearCharacterId, distance: closestCharacterDistance });
       }
       renderer.render(threeScene, camera);
       frameId = window.requestAnimationFrame(animate);
@@ -928,6 +1130,7 @@ function SceneWalkthrough3D({ location, scene, sceneNodes, activeSceneNodeId, pr
       renderer.domElement.removeEventListener('pointercancel', handlePointerUp);
       renderer.dispose();
       nodeObjectsRef.current = [];
+      characterObjectsRef.current = [];
       if (renderer.domElement.parentElement === mount) mount.removeChild(renderer.domElement);
     };
     });
@@ -936,9 +1139,10 @@ function SceneWalkthrough3D({ location, scene, sceneNodes, activeSceneNodeId, pr
       disposed = true;
       cleanupScene();
     };
-  }, [location, sceneNodes]);
+  }, [location, sceneCharacters, sceneNodes]);
 
   const nearNode = sceneNodes.find((node) => node.id === nearNodeId);
+  const nearCharacter = sceneCharacters.find((entry) => entry.id === nearCharacterId);
 
   return (
     <div className="scene-3d-shell">
@@ -953,10 +1157,15 @@ function SceneWalkthrough3D({ location, scene, sceneNodes, activeSceneNodeId, pr
         <span>目標：{activeNode?.title ?? '未標記'}{activeDistance !== null ? ` / ${activeDistance.toFixed(1)}m` : ''}</span>
         <span className="scene-3d-direction"><i style={{ transform: `rotate(${targetDirection.angle}rad)` }} />{targetDirection.label}</span>
         <span>WASD / 方向鍵移動，拖曳畫面轉向</span>
-        <span>靠近信標按 E 選取事件點</span>
+        <span>靠近人物或信標按 E 互動</span>
       </div>
+      {nearCharacter && (
+        <button className="scene-3d-prompt character" type="button" onClick={() => onInteractCharacter(nearCharacter.character.id, 'talk')}>
+          交談：{nearCharacter.character.zhName}
+        </button>
+      )}
       {nearNode && (
-        <button className="scene-3d-prompt" type="button" onClick={() => onSelectSceneNode(nearNode.id)}>
+        <button className={`scene-3d-prompt ${nearCharacter ? 'stacked' : ''}`} type="button" onClick={() => onSelectSceneNode(nearNode.id)}>
           進入：{nearNode.title}
         </button>
       )}
@@ -964,12 +1173,65 @@ function SceneWalkthrough3D({ location, scene, sceneNodes, activeSceneNodeId, pr
   );
 }
 
-function SceneOverlay({ location, relatedCharacters, activeParty, activeQuest, progression, rewardSummary, transitionState, activeSceneNodeId, actionPulse, onSelectSceneNode, onApplyAction, onResolveChoice, onClose }) {
+function SceneCharacterDialogue({ location, character, interaction, rewardSummary, actionPulse, onChoose, onClose }) {
+  if (!character) return null;
+  const portrait = getCharacterPortrait(character.id);
+  const visual = getCharacterVisual(character.id);
+  const dialogue = getCharacterDialogue(character, location, interaction);
+  const supportUsed = Boolean(interaction?.helped);
+
+  return (
+    <aside className="scene-dialogue-backdrop" aria-label="角色對話">
+      <section className="scene-dialogue-card hud-panel" style={{ '--character-tint': visual.tint, '--character-accent': visual.accent }}>
+        <button className="scene-dialogue-close" type="button" onClick={onClose} aria-label="關閉對話">
+          <X size={18} />
+        </button>
+        <div className="scene-dialogue-portrait">
+          {portrait ? <img src={portrait} alt="" /> : <UserRound size={42} />}
+        </div>
+        <div className="scene-dialogue-copy">
+          <p>Character Encounter</p>
+          <h3>{character.zhName}</h3>
+          <span>{character.role} / {character.archetype}</span>
+          <blockquote>{dialogue.line}</blockquote>
+          <div className="scene-dialogue-effects">
+            <span>{dialogue.intel}</span>
+            <span>{dialogue.support}</span>
+          </div>
+          {rewardSummary?.characterName === character.zhName && (
+            <div className="scene-dialogue-result" key={rewardSummary.id}>
+              <strong>{rewardSummary.characterInteractionTitle}</strong>
+              <small>Intel +{rewardSummary.intelGained} / {rewardSummary.characterRewards.map((reward) => `${reward.name} +${reward.gainedXp} XP`).join('、')}</small>
+              <ResourceDeltaList delta={rewardSummary.resourceDelta} resources={rewardSummary.partyResources} compact />
+            </div>
+          )}
+          <div className="scene-dialogue-actions">
+            <button type="button" className={actionPulse?.interactionType === 'talk' ? 'resolved' : ''} onClick={() => onChoose(character.id, 'talk')}>
+              <strong>詢問地點情報</strong>
+              <small>取得 Intel 與角色 XP</small>
+            </button>
+            <button type="button" className={actionPulse?.interactionType === 'support' ? 'resolved' : ''} disabled={supportUsed} onClick={() => onChoose(character.id, 'support')}>
+              <strong>{supportUsed ? '已提供支援' : '請求角色支援'}</strong>
+              <small>{supportUsed ? '每個地點只能使用一次' : '調整 Hope / Fatigue / Corruption'}</small>
+            </button>
+          </div>
+        </div>
+      </section>
+    </aside>
+  );
+}
+
+function SceneOverlay({ location, relatedCharacters, activeParty, activeQuest, progression, rewardSummary, transitionState, activeSceneNodeId, actionPulse, dialogueCharacterId, onSelectSceneNode, onApplyAction, onOpenCharacterDialogue, onInteractCharacter, onCloseCharacterDialogue, onResolveChoice, onClose }) {
   const toneClass = sceneToneClass[location.danger] ?? 'scene-watch';
   const scene = getLocationScene(location.id);
   const sceneNodes = useMemo(() => getSceneNodes(location), [location]);
+  const sceneCharacters = useMemo(
+    () => buildSceneCharacters(location, characters.filter((character) => character.relatedLocations.includes(location.id)), activeParty),
+    [activeParty, location],
+  );
   const [scenePlayerPose, setScenePlayerPose] = useState({ x: 0, z: 7, yaw: 0 });
   const [nearbySceneNode, setNearbySceneNode] = useState({ nodeId: null, distance: Infinity });
+  const [nearbySceneCharacter, setNearbySceneCharacter] = useState({ characterId: null, distance: Infinity });
   const handlePlayerPoseChange = useCallback((pose) => {
     setScenePlayerPose((current) => {
       const moved = Math.abs(current.x - pose.x) > 0.18 || Math.abs(current.z - pose.z) > 0.18;
@@ -984,9 +1246,19 @@ function SceneOverlay({ location, relatedCharacters, activeParty, activeQuest, p
       return nodeChanged || distanceChanged ? next : current;
     });
   }, []);
+  const handleNearbyCharacterChange = useCallback((next) => {
+    setNearbySceneCharacter((current) => {
+      const characterChanged = current.characterId !== next.characterId;
+      const distanceChanged = Math.abs((current.distance ?? Infinity) - next.distance) > 0.18;
+      return characterChanged || distanceChanged ? next : current;
+    });
+  }, []);
   const activeSceneNode = sceneNodes.find((node) => node.id === activeSceneNodeId) ?? sceneNodes[0];
   const activeNodeReachable = nearbySceneNode.nodeId === activeSceneNode.id;
   const nearestNode = sceneNodes.find((node) => node.id === nearbySceneNode.nodeId);
+  const nearbyCharacter = sceneCharacters.find((entry) => entry.id === nearbySceneCharacter.characterId);
+  const dialogueCharacter = dialogueCharacterId ? characters.find((character) => character.id === dialogueCharacterId) : null;
+  const dialogueInteraction = dialogueCharacter ? getSceneCharacterInteraction(location.id, dialogueCharacter.id, progression) : null;
   const encounter = getSceneEncounter({ location, sceneNode: activeSceneNode, activeQuest, activeParty, progression });
   const actions = getSceneActions({ location, activeQuest, activeParty, progression, encounter });
   const partyPower = getActivePartyPower(activeParty, location);
@@ -1010,11 +1282,15 @@ function SceneOverlay({ location, relatedCharacters, activeParty, activeQuest, p
             location={location}
             scene={scene}
             sceneNodes={sceneNodes}
+            sceneCharacters={sceneCharacters}
             activeSceneNodeId={activeSceneNodeId}
             progression={progression}
+            actionPulse={actionPulse}
             onSelectSceneNode={onSelectSceneNode}
             onPlayerPoseChange={handlePlayerPoseChange}
             onNearbyNodeChange={handleNearbyNodeChange}
+            onNearbyCharacterChange={handleNearbyCharacterChange}
+            onInteractCharacter={onOpenCharacterDialogue}
           />
           <div className="scene-party-strip">
             {activeParty.slice(0, 4).map(({ character, status }) => {
@@ -1055,6 +1331,25 @@ function SceneOverlay({ location, relatedCharacters, activeParty, activeQuest, p
                 );
               })()
             ))}
+            {sceneCharacters.map((entry) => {
+              const interaction = getSceneCharacterInteraction(location.id, entry.character.id, progression);
+
+              return (
+                <button
+                  type="button"
+                  key={entry.character.id}
+                  className={`scene-character-map-marker ${nearbySceneCharacter.characterId === entry.character.id ? 'nearby' : ''} ${interaction.talks > 0 ? 'known' : ''}`}
+                  style={{
+                    left: `${clamp(((entry.position.x + 12) / 24) * 100, 8, 92)}%`,
+                    top: `${clamp(((entry.position.z + 13) / 26) * 100, 8, 92)}%`,
+                  }}
+                  onClick={() => onOpenCharacterDialogue(entry.character.id)}
+                  aria-label={`交談 ${entry.character.zhName}`}
+                >
+                  {entry.portrait ? <img src={entry.portrait} alt="" /> : <span>{entry.character.zhName.slice(0, 1)}</span>}
+                </button>
+              );
+            })}
           </div>
         </div>
         <div className="scene-copy">
@@ -1130,6 +1425,37 @@ function SceneOverlay({ location, relatedCharacters, activeParty, activeQuest, p
               <span key={character.id}>{character.zhName}</span>
             ))}
           </div>
+          <section className="scene-character-board" aria-label="地點人物互動">
+            <div className="scene-character-heading">
+              <h3>在場人物</h3>
+              <small>{nearbyCharacter ? `目前靠近：${nearbyCharacter.character.zhName}` : `顯示 ${sceneCharacters.length} 名地點人物，靠近後按 E 交談`}</small>
+            </div>
+            <div className="scene-character-grid">
+              {sceneCharacters.map((entry) => {
+                const interaction = getSceneCharacterInteraction(location.id, entry.character.id, progression);
+                const reachable = nearbySceneCharacter.characterId === entry.character.id;
+
+                return (
+                  <article
+                    key={entry.character.id}
+                    className={`scene-character-card ${reachable ? 'reachable' : ''} ${interaction.talks > 0 ? 'known' : ''} ${actionPulse?.characterId === entry.character.id ? 'resolved' : ''}`}
+                    style={{ '--character-tint': getCharacterVisual(entry.character.id).tint, '--character-accent': getCharacterVisual(entry.character.id).accent }}
+                  >
+                    {entry.portrait ? <img src={entry.portrait} alt="" /> : <UserRound size={20} />}
+                    <div>
+                      <strong>{entry.character.zhName}</strong>
+                      <span>{entry.character.role}</span>
+                      <small>{entry.source} / {interaction.talks > 0 ? `已交談 ${interaction.talks} 次` : '尚未接觸'}</small>
+                    </div>
+                    <div className="scene-character-actions">
+                      <button type="button" disabled={!reachable} onClick={() => onOpenCharacterDialogue(entry.character.id)}>交談</button>
+                      <button type="button" disabled={!reachable || interaction.helped} onClick={() => onOpenCharacterDialogue(entry.character.id)}>{interaction.helped ? '已支援' : '支援'}</button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
           <section className="scene-action-board">
             <h3>事件抉擇</h3>
             {!activeNodeReachable && (
@@ -1192,11 +1518,11 @@ function SceneOverlay({ location, relatedCharacters, activeParty, activeQuest, p
                   <h3>探索結算</h3>
                 </div>
               </div>
-              {rewardSummary.encounterTitle && (
+              {(rewardSummary.encounterTitle || rewardSummary.characterInteractionTitle) && (
                 <div className="reward-context">
-                  <strong>{rewardSummary.encounterTitle}</strong>
-                  <span>{rewardSummary.choiceTitle ? `選擇：${rewardSummary.choiceTitle}` : rewardSummary.wasRecommended ? '採用推薦策略' : `非推薦策略，建議行動為 ${rewardSummary.recommendedAction}`}</span>
-                  <small>{rewardSummary.choiceAbility ? `${rewardSummary.choiceAbility} 檢定 ${rewardSummary.choiceChance}% / ` : ''}節點掌控 +{rewardSummary.nodeProgressGained}，目前 {rewardSummary.nodeProgress * 20}%</small>
+                  <strong>{rewardSummary.characterInteractionTitle ?? rewardSummary.encounterTitle}</strong>
+                  <span>{rewardSummary.characterInteractionTitle ? `${rewardSummary.characterName} 提供地點情報與隊伍狀態調整` : rewardSummary.choiceTitle ? `選擇：${rewardSummary.choiceTitle}` : rewardSummary.wasRecommended ? '採用推薦策略' : `非推薦策略，建議行動為 ${rewardSummary.recommendedAction}`}</span>
+                  <small>{rewardSummary.characterInteractionTitle ? `角色互動 / ${rewardSummary.encounterFocus}` : `${rewardSummary.choiceAbility ? `${rewardSummary.choiceAbility} 檢定 ${rewardSummary.choiceChance}% / ` : ''}節點掌控 +${rewardSummary.nodeProgressGained}，目前 ${rewardSummary.nodeProgress * 20}%`}</small>
                   {rewardSummary.choiceContributors?.length > 0 && (
                     <div className="reward-contributors">
                       {rewardSummary.choiceContributors.map((entry) => (
@@ -1240,6 +1566,17 @@ function SceneOverlay({ location, relatedCharacters, activeParty, activeQuest, p
           )}
         </div>
       </section>
+      {dialogueCharacter && (
+        <SceneCharacterDialogue
+          location={location}
+          character={dialogueCharacter}
+          interaction={dialogueInteraction}
+          rewardSummary={rewardSummary}
+          actionPulse={actionPulse}
+          onChoose={onInteractCharacter}
+          onClose={onCloseCharacterDialogue}
+        />
+      )}
     </div>
   );
 }
@@ -1359,11 +1696,11 @@ function CampaignLogDrawer({ open, logEntries, onClear, onClose }) {
               <span>{getLocationName(entry.locationId, entry.locationName)}</span>
               <small>{new Date(entry.createdAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}</small>
             </div>
-            <strong>{entry.choiceTitle ?? entry.encounterTitle ?? '快速行動'}</strong>
-            <p>{entry.choiceAbility ? `${entry.choiceAbility} 檢定 ${entry.choiceChance}%` : entry.encounterTitle}</p>
+            <strong>{entry.characterInteractionTitle ?? entry.choiceTitle ?? entry.encounterTitle ?? '快速行動'}</strong>
+            <p>{entry.characterInteractionTitle ? `${entry.characterName} 提供支援` : entry.choiceAbility ? `${entry.choiceAbility} 檢定 ${entry.choiceChance}%` : entry.encounterTitle}</p>
             <div className="campaign-log-stats">
               <span>Intel +{entry.intelGained}</span>
-              <span>掌控 +{entry.nodeProgressGained}</span>
+              <span>{entry.characterInteractionTitle ? '人物互動' : `掌控 +${entry.nodeProgressGained}`}</span>
               <span>{entry.questAdvanced ? '任務推進' : '任務記錄'}</span>
             </div>
             <ResourceDeltaList delta={entry.resourceDelta} resources={entry.partyResources} compact />
@@ -1401,6 +1738,7 @@ function AdventureMap({ onSwitchView }) {
   const [sceneRewardSummary, setSceneRewardSummary] = useState(null);
   const [sceneTransition, setSceneTransition] = useState('entering');
   const [activeSceneNodeId, setActiveSceneNodeId] = useState('entry');
+  const [dialogueCharacterId, setDialogueCharacterId] = useState(null);
   const [actionPulse, setActionPulse] = useState(null);
   const [rosterOpen, setRosterOpen] = useState(false);
   const [characterDrawerOpen, setCharacterDrawerOpen] = useState(false);
@@ -1542,6 +1880,7 @@ function AdventureMap({ onSwitchView }) {
     setSceneLocationId(selectedLocation.id);
     setSceneRewardSummary(null);
     setActiveSceneNodeId('entry');
+    setDialogueCharacterId(null);
     setActionPulse(null);
   };
 
@@ -1553,6 +1892,7 @@ function AdventureMap({ onSwitchView }) {
     setSceneLocationId(locationId);
     setSceneRewardSummary(null);
     setActiveSceneNodeId('entry');
+    setDialogueCharacterId(null);
     setActionPulse(null);
   };
 
@@ -1600,6 +1940,32 @@ function AdventureMap({ onSwitchView }) {
     window.setTimeout(() => setActionPulse(null), 820);
   };
 
+  const handleSceneCharacterInteraction = (characterId, interactionType = 'talk') => {
+    if (!sceneLocation) return;
+    const character = characters.find((entry) => entry.id === characterId);
+    if (!character) return;
+
+    const { nextState, rewardSummary } = applySceneCharacterInteractionReward(progression, interactionType, {
+      location: sceneLocation,
+      character,
+      activeQuest,
+    });
+    if (!rewardSummary) return;
+    setProgression(nextState);
+    setSceneRewardSummary(rewardSummary);
+    setDialogueCharacterId(characterId);
+    setActionPulse({ id: rewardSummary.id, characterId, interactionType });
+    window.setTimeout(() => setActionPulse(null), 820);
+  };
+
+  const handleOpenCharacterDialogue = (characterId) => {
+    setDialogueCharacterId(characterId);
+  };
+
+  const handleCloseCharacterDialogue = () => {
+    setDialogueCharacterId(null);
+  };
+
   const triggerChapterComplete = (rewardSummary) => {
     if (chapterTimerRef.current) window.clearTimeout(chapterTimerRef.current);
     setChapterCompleteSummary(rewardSummary);
@@ -1618,6 +1984,7 @@ function AdventureMap({ onSwitchView }) {
       setSceneLocationId(null);
       setSceneTransition('entering');
       setActiveSceneNodeId('entry');
+      setDialogueCharacterId(null);
       setActionPulse(null);
       setUnlockAnimation({ id: `${Date.now()}-${locationId}`, locationId, locationName: unlockedLocation?.zhName ?? locationId });
       focusLocationOnMap(locationId);
@@ -1654,6 +2021,7 @@ function AdventureMap({ onSwitchView }) {
       setSceneRewardSummary(null);
       setSceneTransition('entering');
       setActiveSceneNodeId('entry');
+      setDialogueCharacterId(null);
       setActionPulse(null);
     }, 420);
   };
@@ -1668,6 +2036,7 @@ function AdventureMap({ onSwitchView }) {
     setProgression(createDefaultProgression(characters, locations, quests));
     setSceneRewardSummary(null);
     setChapterCompleteSummary(null);
+    setDialogueCharacterId(null);
   };
 
   const handleToggleExplorationMode = () => {
@@ -1917,8 +2286,12 @@ function AdventureMap({ onSwitchView }) {
           transitionState={sceneTransition}
           activeSceneNodeId={activeSceneNodeId}
           actionPulse={actionPulse}
+          dialogueCharacterId={dialogueCharacterId}
           onSelectSceneNode={handleSelectSceneNode}
           onApplyAction={handleSceneAction}
+          onOpenCharacterDialogue={handleOpenCharacterDialogue}
+          onInteractCharacter={handleSceneCharacterInteraction}
+          onCloseCharacterDialogue={handleCloseCharacterDialogue}
           onResolveChoice={handleResolveSceneChoice}
           onClose={handleCloseScene}
         />

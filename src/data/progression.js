@@ -111,6 +111,9 @@ export function createDefaultProgression(characters, locations, quests) {
         ),
       ]),
     ),
+    sceneCharacters: Object.fromEntries(
+      locations.map((location) => [location.id, {}]),
+    ),
     exploration: {
       enabled: false,
       unlockedLocationIds: [EXPLORATION_ROUTE[0]],
@@ -196,6 +199,26 @@ function normalizeProgression(rawState, characters, locations, quests) {
                 },
               ];
             }),
+          ),
+        ];
+      }),
+    ),
+    sceneCharacters: Object.fromEntries(
+      locations.map((location) => {
+        const sourceCharacters = source.sceneCharacters?.[location.id] ?? defaults.sceneCharacters[location.id];
+
+        return [
+          location.id,
+          Object.fromEntries(
+            Object.entries(sourceCharacters ?? {})
+              .filter(([, interaction]) => interaction && typeof interaction === 'object')
+              .map(([characterId, interaction]) => [
+                characterId,
+                {
+                  talks: Math.max(0, Number(interaction.talks) || 0),
+                  helped: Boolean(interaction.helped),
+                },
+              ]),
           ),
         ];
       }),
@@ -416,11 +439,14 @@ function appendCampaignLog(nextState, rewardSummary) {
     locationName: rewardSummary.locationName,
     questTitle: rewardSummary.questTitle,
     encounterTitle: rewardSummary.encounterTitle,
+    characterInteractionTitle: rewardSummary.characterInteractionTitle,
+    characterName: rewardSummary.characterName,
     choiceTitle: rewardSummary.choiceTitle,
     choiceAbility: rewardSummary.choiceAbility,
     choiceChance: rewardSummary.choiceChance,
     contributors: rewardSummary.choiceContributors ?? [],
     intelGained: rewardSummary.intelGained,
+    hopeGained: rewardSummary.hopeGained,
     nodeProgressGained: rewardSummary.nodeProgressGained,
     resourceDelta: rewardSummary.resourceDelta,
     partyResources: rewardSummary.partyResources,
@@ -577,6 +603,120 @@ const choiceRewardModeAction = {
   party: 'party-bond',
   story: 'scout',
 };
+
+function getCharacterInteractionDelta(character, interactionType) {
+  const support = interactionType === 'support';
+  const delta = {
+    hope: support ? 3 : 2,
+    fatigue: support ? -2 : -1,
+    corruption: 0,
+  };
+
+  if (['Istari', 'Survivor', 'Guardian'].includes(character.archetype)) {
+    delta.hope += 1;
+    delta.corruption -= support ? 2 : 1;
+  }
+
+  if (['Ranger King', 'Warden', 'Marksman'].includes(character.archetype)) {
+    delta.fatigue -= 1;
+  }
+
+  if (['Raid Boss', 'Stalker'].includes(character.archetype)) {
+    delta.hope -= support ? 2 : 1;
+    delta.fatigue += 1;
+    delta.corruption += support ? 2 : 1;
+  }
+
+  if (character.faction === '魔多') {
+    delta.corruption += 2;
+  }
+
+  return {
+    hope: clamp(delta.hope, -5, 6),
+    fatigue: clamp(delta.fatigue, -5, 5),
+    corruption: clamp(delta.corruption, -4, 6),
+  };
+}
+
+export function getSceneCharacterInteraction(locationId, characterId, state) {
+  return state.sceneCharacters?.[locationId]?.[characterId] ?? { talks: 0, helped: false };
+}
+
+export function applySceneCharacterInteractionReward(state, interactionType, { location, character, activeQuest }) {
+  const nextState = structuredClone(state);
+  const characterRewards = [];
+  const unlocks = [];
+  const locationProgress = nextState.locations[location.id];
+  const beforeMastery = getLocationMastery(locationProgress.intel);
+  const locationCharacters = nextState.sceneCharacters[location.id] ?? {};
+  const currentInteraction = locationCharacters[character.id] ?? { talks: 0, helped: false };
+  const alreadyHelped = currentInteraction.helped && interactionType === 'support';
+  const repeatedTalks = currentInteraction.talks;
+  const related = character.relatedLocations.includes(location.id);
+  const questRelevant = activeQuest.locationIds.includes(location.id);
+  const interactionLabel = interactionType === 'support' ? '請求支援' : '交談情報';
+  const baseIntel = interactionType === 'support' ? 10 : 14;
+  const repeatPenalty = Math.min(8, repeatedTalks * 4 + (alreadyHelped ? 8 : 0));
+  const intelGained = clamp(baseIntel + (related ? 6 : 0) + (questRelevant ? 3 : 0) - repeatPenalty, 2, 24);
+  const gainedXp = clamp((interactionType === 'support' ? 16 : 10) + (related ? 6 : 0) - repeatedTalks * 2, 4, 28);
+
+  locationProgress.intel = clamp(locationProgress.intel + intelGained, 0, maxLocationIntel);
+  locationProgress.visits += 1;
+  locationCharacters[character.id] = {
+    talks: currentInteraction.talks + 1,
+    helped: currentInteraction.helped || interactionType === 'support',
+  };
+  nextState.sceneCharacters[location.id] = locationCharacters;
+  applyCharacterXp(nextState, character, gainedXp, unlocks, characterRewards);
+
+  const afterMastery = getLocationMastery(locationProgress.intel);
+  locationProgress.masteryLevel = afterMastery.key;
+  if (beforeMastery.key !== afterMastery.key) {
+    unlocks.push(`${location.zhName} 熟練度提升為 ${afterMastery.title}`);
+  }
+
+  const resourceDelta = getCharacterInteractionDelta(character, interactionType);
+  applyPartyResourceDelta(nextState, resourceDelta);
+
+  const rewardSummary = {
+    id: `${Date.now()}-${location.id}-${character.id}`,
+    actionId: `character-${interactionType}`,
+    locationId: location.id,
+    locationName: location.zhName,
+    characterInteractionTitle: `${interactionLabel}：${character.zhName}`,
+    characterName: character.zhName,
+    intelGained,
+    beforeLocationMastery: beforeMastery.title,
+    locationMastery: afterMastery.title,
+    locationVisits: locationProgress.visits,
+    questTitle: activeQuest.title,
+    questAdvanced: false,
+    questMilestone: nextState.quests[activeQuest.id]?.milestone ?? 0,
+    choiceTitle: null,
+    choicePrompt: null,
+    choiceAbility: null,
+    choiceChance: null,
+    choiceResultTier: null,
+    choiceContributors: [],
+    encounterTitle: null,
+    encounterFocus: character.role,
+    encounterRisk: null,
+    successChance: null,
+    recommendedAction: interactionType === 'support' ? '角色支援' : '交談情報',
+    wasRecommended: true,
+    nodeProgressGained: 0,
+    nodeProgress: 0,
+    resourceDelta,
+    partyResources: nextState.partyResources,
+    explorationUnlockedLocationId: null,
+    characterRewards,
+    unlocks,
+  };
+
+  nextState.lastReward = rewardSummary;
+  appendCampaignLog(nextState, rewardSummary);
+  return { nextState, rewardSummary };
+}
 
 export function applySceneActionReward(state, actionId, { location, activeQuest, activeParty, encounter, choice = null }) {
   const nextState = structuredClone(state);
